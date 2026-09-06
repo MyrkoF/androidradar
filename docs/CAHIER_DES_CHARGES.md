@@ -66,9 +66,18 @@ Fiabilité (préalable, non négociable)
 - Barre d'état : satellites GNSS utilisés / vus à côté de la précision GPS.
 - Fabricant : nom d'affichage dérivé du nom long de la table OUI (le nom court Wireshark est tronqué à 12 caractères).
 
+### 4 ter. Capteurs du téléphone (décision 2026-09-06, issue #8) — une seule itération
+
+- **Boussole** (rotation vector) : carte orientée cap en haut ; en mode marche, *indication* de direction par masquage corporel (variation du RSSI selon le cap en tournant sur soi-même, ±30°). Indication, jamais mesure — le cahier §2 reste vrai : un RSSI seul n'a pas d'angle.
+- **Cellulaire** (`TelephonyManager.allCellInfo`) : cellules LTE/5G (identifiants, RSRP/RSRQ, opérateur) relevées par position → couche de couverture cellulaire sur la carte, export. Une nouvelle cellule apparue = signalée (veille).
+- **Wi-Fi RTT** (802.11mc/az) : distance *mesurée* vers les AP qui le supportent ; marqués comme tels, distinguée de la distance *estimée*.
+- **Baromètre** : altitude relative → étage probable de l'émetteur en bâtiment.
+- **Estime** (podomètre + boussole) : prolonge la trace quand le GPS décroche en intérieur ; positions marquées « à l'estime », incertitude qui grandit avec les pas.
+- Exclus : BLE direction finding, UWB, sub-GHz (v0.3), micro, caméra.
+
 ## 5. Appareils cibles
 
-Android 8+ (minSdk 26), plusieurs modèles possibles, aucun figé. Tout doit fonctionner sans Play Services (GPS natif, carte MapLibre). Bancs de test : vivo X Fold 5 (OriginOS) en premier, puis Xiaomi Redmi 14 (HyperOS). Les deux surcouches tuent agressivement les services en arrière-plan : l'app doit détecter l'optimisation batterie active et guider vers son désactivation (écran Session), et le service de scan doit se relancer seul s'il est tué.
+Android 13+ (minSdk 33, décision 2026-09-06 : pas de rétrocompatibilité si un Android récent apporte de meilleures fonctions — Wi-Fi 6E/7, RTT, cellules 5G typées, permissions unifiées), plusieurs modèles possibles, aucun figé. Tout doit fonctionner sans Play Services (GPS natif, carte MapLibre). Bancs de test : vivo X Fold 5 (OriginOS) en premier, puis Xiaomi Redmi 14 (HyperOS). Les deux surcouches tuent agressivement les services en arrière-plan : l'app doit détecter l'optimisation batterie active et guider vers son désactivation (écran Session), et le service de scan doit se relancer seul s'il est tué.
 
 ## 6. Données
 
