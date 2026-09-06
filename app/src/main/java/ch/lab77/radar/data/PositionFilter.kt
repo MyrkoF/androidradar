@@ -6,7 +6,7 @@ package ch.lab77.radar.data
  * qu'on bouge ; ces sauts sont tenus, pas dessinés. Pur Kotlin, testé en CI.
  */
 object PositionFilter {
-    data class Fix(val lat: Double, val lon: Double, val acc: Float, val t: Long)
+    data class Fix(val lat: Double, val lon: Double, val acc: Float, val t: Long, val estimated: Boolean = false)
 
     const val METERS_PER_STEP = 1.0
     const val SLACK_M = 3.0
@@ -23,6 +23,10 @@ object PositionFilter {
     fun accept(prev: Fix?, next: Fix, stepsSince: Int, stepsKnown: Boolean): Boolean {
         if (next.acc > 100f) return prev == null            // fix inutilisable, sauf si on n'a rien
         if (prev == null) return true
+        // Un fix nettement plus précis que ce qu'on tient le remplace toujours — sinon l'estime, dont
+        // l'incertitude grandit à chaque pas, rejetterait le GPS qui pourrait la corriger (retour terrain n°4).
+        if (prev.estimated && next.acc <= GOOD_ACC_M) return true
+        if (next.acc <= 30f && next.acc < prev.acc * 0.7f) return true
         val d = Estimator.distanceM(prev.lat, prev.lon, next.lat, next.lon)
         val dt = (next.t - prev.t).coerceAtLeast(1L) / 1000.0
         val budget = (if (stepsKnown) stepsSince * METERS_PER_STEP else WALK_SPEED_MS * dt) + SLACK_M

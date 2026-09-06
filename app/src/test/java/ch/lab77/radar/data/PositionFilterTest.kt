@@ -34,6 +34,16 @@ class PositionFilterTest {
         assertFalse(PositionFilter.accept(prev, fix(60.0, 30f, 10_000), stepsSince = 0, stepsKnown = false))
     }
 
+    @Test fun `un bon GPS reprend toujours la main sur l estime`() {
+        // capture du 07/09 : estime dérivée à ±97 m, 19 satellites, GPS rejeté faute de pas
+        val drift = PositionFilter.Fix(lat0, lon0, 97f, 0, estimated = true)
+        assertTrue(PositionFilter.accept(drift, fix(60.0, 8f, 10_000), stepsSince = 3, stepsKnown = true))
+        // position tenue imprécise (45 m) puis fix précis à 60 m : la précédente était fausse, on prend
+        assertTrue(PositionFilter.accept(fix(0.0, 45f, 0), fix(60.0, 12f, 10_000), stepsSince = 0, stepsKnown = true))
+        // mais un fix aussi imprécis que le précédent, sans pas, reste rejeté
+        assertFalse(PositionFilter.accept(fix(0.0, 45f, 0), fix(60.0, 40f, 10_000), stepsSince = 0, stepsKnown = true))
+    }
+
     @Test fun `premier fix et fix inutilisable`() {
         assertTrue(PositionFilter.accept(null, fix(0.0, 30f, 0), 0, true))
         assertFalse(PositionFilter.accept(fix(0.0, 30f, 0), fix(0.0, 150f, 5_000), 0, true))

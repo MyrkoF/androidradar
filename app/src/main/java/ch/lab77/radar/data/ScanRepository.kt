@@ -88,7 +88,7 @@ object ScanRepository {
     fun setLocation(loc: Location, estimated: Boolean = false) {
         val now = System.currentTimeMillis()
         val st = _status.value
-        val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 50f, now)
+        val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 50f, now, estimated)
         val ok = estimated || PositionFilter.accept(acceptedFix, next, st.steps - stepsAtAccepted, st.stepsKnown)
         if (!estimated) lastRealFixAt = now
         if (ok) {
