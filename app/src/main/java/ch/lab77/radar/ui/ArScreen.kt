@@ -40,6 +40,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.RangeFinder
+import ch.lab77.radar.scan.SystemTweaks
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.scan.ArTracker
 import com.google.ar.core.Coordinates2d
@@ -89,7 +91,11 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
                                 wantHit = false
                                 tracker.hitCenter(frame, w, h)?.let { (lat, lon, dist) ->
                                     ScanRepository.pinPosition(target.id, lat, lon, 1.5f)
-                                    main.post { pointed = "✓ ${target.name.ifBlank { target.id }} pointé à ${"%.1f".format(dist)} m — position figée" }
+                                    // (#20) contrôle croisé avec la visée par inclinaison
+                                    val tilt = ScanRepository.status.value.pitch?.let { RangeFinder.distanceM(SystemTweaks.eyeHeightCm(ctx) / 100f, it) }
+                                    val check = if (tilt != null && kotlin.math.abs(tilt - dist) / maxOf(tilt, dist) > 0.3f)
+                                        "\n⚠ visée par inclinaison ${"%.1f".format(tilt)} m ≠ caméra ${"%.1f".format(dist)} m : hauteur des yeux fausse ou pied de l'objet non visé" else ""
+                                    main.post { pointed = "✓ ${target.name.ifBlank { target.id }} pointé à ${"%.1f".format(dist)} m (caméra) — position figée$check" }
                                 } ?: main.post { pointed = "Rien de solide sous le réticule : visez une surface (mur, boîtier)" }
                             }
                         }))
@@ -109,6 +115,7 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
                     else "Gardez l'écran ouvert en marchant : votre position suit vos vrais déplacements (±1,5 m). Immobile = position figée.",
                     color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
                 )
+                tracker.eyeHeightCalibratedCm?.let { Text("Hauteur des yeux calibrée par la caméra : $it cm", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
                 if (target != null) Text("Objet à pointer : ${target.name.ifBlank { target.vendor.ifBlank { target.id } }} — mettez son boîtier sous le réticule", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 PaceIndicator(st, target?.kind, ar = true)
                 pointed?.let { Text(it, color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }

@@ -1,0 +1,1 @@
+- ARCore calibre la hauteur des yeux (sol détecté) ; contrôle croisé caméra / visée par inclinaison au « Pointer »

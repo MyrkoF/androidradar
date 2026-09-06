@@ -8,6 +8,7 @@ import ch.lab77.radar.data.ScanRepository
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -32,6 +33,9 @@ class ArTracker(private val ctx: Context) {
     var walkedM = 0.0
         private set
     var still = false
+        private set
+    private var lastFloorCheck = 0L
+    var eyeHeightCalibratedCm: Int? = null
         private set
 
     fun availability(): String = try {
@@ -104,6 +108,23 @@ class ArTracker(private val ctx: Context) {
         }
         lastPose = pose
         still = now - lastMoveAt > 1_500
+        // (#20) Calibration de la hauteur des yeux : le sol détecté par ARCore donne la hauteur réelle de la caméra
+        if (eyeHeightCalibratedCm == null && now - lastFloorCheck > 2_000) {
+            lastFloorCheck = now
+            try {
+                val floor = session?.getAllTrackables(Plane::class.java)
+                    ?.filter { it.trackingState == TrackingState.TRACKING && it.type == Plane.Type.HORIZONTAL_UPWARD_FACING && it.centerPose.ty() < pose.ty() }
+                    ?.minByOrNull { it.centerPose.ty() }
+                if (floor != null) {
+                    val cm = ((pose.ty() - floor.centerPose.ty()) * 100).toInt()
+                    if (cm in 90..230) {
+                        eyeHeightCalibratedCm = cm
+                        SystemTweaks.setEyeHeightCm(ctx, cm)
+                        ScanRepository.logLine("ARCore : hauteur des yeux calibrée à $cm cm (sol détecté) — la visée par inclinaison en profite")
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         ScanRepository.setStatus { it.copy(arTracking = if (still) "suivi · immobile · ${walkedM.toInt()} m parcourus" else "suivi · ${walkedM.toInt()} m parcourus") }
         if (still || now - lastEmitAt < 500) return
         lastEmitAt = now
