@@ -18,12 +18,17 @@ import ch.lab77.radar.data.ScanRepository
  * Quand startScan() refuse, on relit quand même le cache système : il est rafraîchi par les scans du
  * système lui-même. Les résultats sont aussi passés au module RTT (distances mesurées).
  */
+private const val BURST_MS = 3_000L
+
 class WifiScanner(private val ctx: Context, private val rtt: RttRanger? = null, private val intervalMs: Long = 8_000L) : Sensor {
     override val label = "Wi-Fi"
     private val wifi = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
     override val isRunning: Boolean get() = running
+    /** Rafale (objet dans le moniteur, #12) : mesures rapprochées pour que la rose des caps se remplisse en un tour. */
+    @Volatile var burst = false
+    private val currentInterval: Long get() = if (burst) BURST_MS else intervalMs
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) { if (running) ingest() }
@@ -36,7 +41,7 @@ class WifiScanner(private val ctx: Context, private val rtt: RttRanger? = null, 
             val ok = try { wifi.startScan() } catch (_: SecurityException) { false }
             ScanRepository.setStatus { it.copy(wifiThrottled = !ok, wifiScans = it.wifiScans + if (ok) 1 else 0) }
             if (!ok) ingest()
-            handler.postDelayed(this, intervalMs)
+            handler.postDelayed(this, currentInterval)
         }
     }
 

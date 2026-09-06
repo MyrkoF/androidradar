@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 import kotlinx.coroutines.delay
@@ -51,11 +52,13 @@ fun WalkGuide(d: Device, st: ScanStatus, compact: Boolean = false) {
     }
     val trendColor = when { trend == null -> Palette.muted; trend >= 3 -> Palette.green; trend <= -3 -> Palette.amber; else -> Palette.text }
 
-    // Rose des caps : moyenne du signal par secteur de 30° sur les 40 dernières secondes
+    // Rose des caps : moyenne du signal par secteur de 30° sur les 90 dernières secondes
     val bins = DoubleArray(12); val counts = IntArray(12)
+    var received = 0
     for (s in samples) {
         val h = s.heading ?: continue
-        if (now - s.t > 40_000) continue
+        if (now - s.t > 90_000) continue
+        received++
         val b = ((h + 15f) % 360f / 30f).toInt().coerceIn(0, 11)
         bins[b] += s.rssi; counts[b]++
     }
@@ -64,6 +67,14 @@ fun WalkGuide(d: Device, st: ScanStatus, compact: Boolean = false) {
     val best = means.withIndex().filter { !it.value.isNaN() }.maxByOrNull { it.value }?.index
     val minMean = means.filter { !it.isNaN() }.minOrNull() ?: -100.0
     val maxMean = means.filter { !it.isNaN() }.maxOrNull() ?: -30.0
+    // Rose nette (≥ 8 secteurs, ≥ 6 dB de contraste) → la direction devient une observation qui recalcule la position (#12)
+    val confident = filled >= 8 && maxMean - minMean >= 6.0 && best != null
+    var injectedAt by remember { mutableStateOf(0L) }
+    if (confident && st.heading != null && now - injectedAt > 60_000) {
+        injectedAt = now
+        ScanRepository.addBearing(d.id, (best!! * 30).toFloat(), maxMean.toInt())
+    }
+    val rate = when (d.kind) { Kind.WIFI -> if (st.wifiThrottled) "Wi-Fi bridé : 1 mesure / 30 s — désactivez la limitation (Session → Réglages)" else "Wi-Fi : 1 mesure / 3 s → un tour en ~60 s"; Kind.BLE -> "BLE : continu → un tour en ~20 s"; Kind.CELL -> "Cellule : 1 mesure / 5 s → un tour en ~90 s" }
 
     Column(Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (!compact) Text("Guide de marche", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
@@ -89,8 +100,9 @@ fun WalkGuide(d: Device, st: ScanStatus, compact: Boolean = false) {
                 drawCircle(Palette.text, 3.dp.toPx(), c)
             }
             Column {
-                if (filled < 4) Text(if (compact) "Tournez sur vous-même\n(${filled}/12)" else "Tournez lentement sur vous-même,\ntéléphone devant vous (${filled}/12 secteurs).", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                else Text(if (compact) "→ ${best?.let { it * 30 } ?: "?"}° (±30°)" else "Signal le plus fort vers ${best?.let { it * 30 } ?: "?"}° (±30°).\nAvancez dans cette direction, puis refaites un tour.", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = if (compact) 13.sp else 11.sp)
+                if (filled < 4) Text(if (compact) "Tournez sur vous-même\n(${filled}/12 · $received mesures)" else "Tournez lentement sur vous-même,\ntéléphone devant vous (${filled}/12 secteurs, $received mesures).", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                else Text(if (compact) "→ ${best?.let { it * 30 } ?: "?"}° (±30°)" + (if (confident) " ✓ enregistrée" else " · ${filled}/12") else "Signal le plus fort vers ${best?.let { it * 30 } ?: "?"}° (±30°).\nAvancez dans cette direction, puis refaites un tour.", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = if (compact) 13.sp else 11.sp)
+                Text(rate, color = if (d.kind == Kind.WIFI && st.wifiThrottled) Palette.amber else Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                 if (!compact) Text("Nord en haut · barre verte = secteur le plus fort · aiguille = mon cap", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
             }
         }

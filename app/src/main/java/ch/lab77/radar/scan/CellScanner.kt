@@ -24,6 +24,8 @@ import ch.lab77.radar.data.ScanRepository
  * niveau (RSRP), par position. Métadonnées diffusées seulement — rien n'est émis, rien n'est décodé.
  * Sert à cartographier la couverture (site survey) et à repérer une cellule nouvelle (veille).
  */
+private const val BURST_MS = 5_000L
+
 class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor {
     override val label = "Cell"
     private val appCtx = ctx.applicationContext
@@ -31,6 +33,9 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
     override val isRunning: Boolean get() = running
+    /** Rafale (objet dans le moniteur, #12) : mesures rapprochées pour que la rose des caps se remplisse en un tour. */
+    @Volatile var burst = false
+    private val currentInterval: Long get() = if (burst) BURST_MS else intervalMs
 
     private val callback = object : TelephonyManager.CellInfoCallback() {
         override fun onCellInfo(cellInfo: MutableList<CellInfo>) { ingest(cellInfo) }
@@ -42,7 +47,7 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
         override fun run() {
             if (!running) return
             try { tm.requestCellInfoUpdate(ContextCompat.getMainExecutor(appCtx), callback) } catch (_: Exception) { fallback() }
-            handler.postDelayed(this, intervalMs)
+            handler.postDelayed(this, currentInterval)
         }
     }
 

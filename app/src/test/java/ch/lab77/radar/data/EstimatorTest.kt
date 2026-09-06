@@ -6,8 +6,8 @@ import org.junit.Test
 
 class EstimatorTest {
     private val lat0 = 20.6615; private val lon0 = -87.0466
-    private fun at(dNorthM: Double, dEastM: Double, rssi: Int, t: Long = 0L, acc: Float = 5f) =
-        Obs(t, lat0 + dNorthM / 111_320.0, lon0 + dEastM / (111_320.0 * Math.cos(Math.toRadians(lat0))), acc, rssi)
+    private fun at(dNorthM: Double, dEastM: Double, rssi: Int, t: Long = 0L, acc: Float = 5f, bearing: Float? = null) =
+        Obs(t, lat0 + dNorthM / 111_320.0, lon0 + dEastM / (111_320.0 * Math.cos(Math.toRadians(lat0))), acc, rssi, bearing = bearing)
 
     @Test fun `une observation = position du telephone plus un rayon`() {
         val e = Estimator.estimate(listOf(at(0.0, 0.0, -60)), Kind.WIFI, Persistence.UNKNOWN)
@@ -93,6 +93,22 @@ class EstimatorTest {
         // sans verrou préalable, la même mesure forte tire nettement plus loin
         val e3 = Estimator.estimate(far, Kind.WIFI, Persistence.STATIONARY)
         assertTrue(Estimator.distanceM(e1.lat, e1.lon, e3.lat!!, e3.lon!!) > moved)
+    }
+
+    @Test fun `triangulation de directions`() {
+        // cible à 40 m au nord-est de lat0 : vue « vers le nord » depuis (0 E, 0 N)+40 E et « vers l'est » depuis 0 E,+40 N
+        val target = at(40.0, 40.0, -60)
+        val obs = listOf(
+            at(0.0, 40.0, -70, t = 0, bearing = 0f),      // depuis 40 m à l'est, la cible est plein nord
+            at(40.0, 0.0, -70, t = 60_000, bearing = 90f), // depuis 40 m au nord, la cible est plein est
+            at(0.0, 0.0, -75, t = 120_000),
+        )
+        val e = Estimator.estimate(obs, Kind.WIFI, Persistence.UNKNOWN)
+        assertTrue("△ attendu", e.bearingFix)
+        assertEquals(0.0, Estimator.distanceM(target.lat, target.lon, e.lat!!, e.lon!!), 3.0)
+        // directions parallèles ou même position : pas de triangulation
+        assertTrue(Estimator.triangulate(listOf(at(0.0, 0.0, -70, bearing = 0f), at(0.0, 30.0, -70, bearing = 5f)), lat0, lon0) == null)
+        assertTrue(Estimator.triangulate(listOf(at(0.0, 0.0, -70, bearing = 0f), at(0.0, 1.0, -70, bearing = 90f)), lat0, lon0) == null)
     }
 
     @Test fun `persistance`() {

@@ -30,7 +30,7 @@ object GeoJson {
             Feature.fromGeometry(Point.fromLngLat(e.lon!!, e.lat!!)).apply {
                 addStringProperty("id", d.id)
                 addStringProperty("color", kindHex(d.kind))
-                addStringProperty("stroke", when { d.category.isPriority -> "#FF5C5C"; e.rttFix -> "#FFB74D"; e.locked -> "#D9E4E8"; else -> "#7C8F97" })
+                addStringProperty("stroke", when { d.category.isPriority -> "#FF5C5C"; e.rttFix || e.bearingFix -> "#FFB74D"; e.locked -> "#D9E4E8"; else -> "#7C8F97" })
                 addNumberProperty("r", when { d.id == selected -> 11f; d.category.isPriority -> 9f; else -> 6f })
                 addNumberProperty("op", when {
                     selected != null && d.id != selected -> 0.3f          // un objet sélectionné : les autres s'estompent

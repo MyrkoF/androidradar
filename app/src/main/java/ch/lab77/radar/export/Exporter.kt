@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.core.content.FileProvider
 import ch.lab77.radar.data.Category
 import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.Estimate
 import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.Persistence
 import ch.lab77.radar.data.ScanRepository
@@ -18,8 +19,37 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Exports de session : CSV compatible WiGLE 1.4, JSON complet, débrief texte prêt pour un LLM. */
+/**
+ * Exports de session : CSV WiGLE 1.4, JSON, GeoJSON (QGIS), débrief texte prêt pour un LLM.
+ * Position exportée = position CALCULÉE (barycentre / RTT / triangulation / verrou), précision = rayon
+ * d'incertitude — jamais la position du téléphone au dernier passage (#13). Mode « propre » par défaut :
+ * seulement les objets dont la position vaut quelque chose ; « brut » = tout.
+ */
 object Exporter {
+    const val CLEAN_MAX_RADIUS_M = 60f
+
+    /** Point exportable : position calculée si elle existe, sinon position du téléphone (brut seulement). */
+    data class Pt(val lat: Double, val lon: Double, val radius: Float, val method: String, val e: Estimate?)
+
+    fun point(d: Device, e: Estimate?): Pt? = when {
+        e?.lat != null && e.lon != null -> Pt(e.lat, e.lon, e.radius, when { e.rttFix -> "rtt"; e.bearingFix -> "triangulation"; e.locked -> "verrou"; else -> "barycentre" }, e)
+        d.lat != null && d.lon != null -> Pt(d.lat, d.lon, d.accuracy ?: 50f, "dernier passage", null)
+        else -> null
+    }
+
+    /** Propre : stationnaire ou position confirmée (RTT / △ / 🔒), rayon ≤ 60 m, ni passant ni MAC aléatoire. */
+    fun isClean(d: Device, e: Estimate?): Boolean {
+        if (e?.lat == null) return false
+        if (d.category == Category.RANDOMIZED || e.persistence == Persistence.PASSING) return false
+        val confirmed = e.rttFix || e.bearingFix || e.locked || e.persistence == Persistence.STATIONARY
+        return confirmed && e.radius <= CLEAN_MAX_RADIUS_M
+    }
+
+    fun select(devices: Collection<Device>, clean: Boolean): List<Device> {
+        val est = ScanRepository.estimates.value
+        return if (clean) devices.filter { isClean(it, est[it.id]) } else devices.toList()
+    }
+
     private val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
     private val fileStamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
 
@@ -42,6 +72,7 @@ object Exporter {
     // ---- CSV WiGLE 1.4 ------------------------------------------------------------------------
 
     fun wigleCsv(devices: Collection<Device>): String {
+        val est = ScanRepository.estimates.value
         val sb = StringBuilder()
         sb.append("WigleWifi-1.4,appRelease=radar-0.2,model=${Build.MODEL},release=${Build.VERSION.RELEASE},")
         sb.append("device=${Build.DEVICE},display=${Build.DISPLAY},board=${Build.BOARD},brand=${Build.BRAND}\n")
@@ -51,8 +82,9 @@ object Exporter {
             sb.append(csv(d.id)).append(',').append(csv(d.name)).append(',').append(csv(auth)).append(',')
             sb.append(stamp.format(Date(d.firstSeen))).append(',')
             sb.append(d.channel).append(',').append(d.bestRssi).append(',')
-            sb.append(d.lat ?: 0.0).append(',').append(d.lon ?: 0.0).append(',')
-            sb.append(d.altitude ?: 0.0).append(',').append(d.accuracy ?: 0f).append(',')
+            val pt = point(d, est[d.id])
+            sb.append(pt?.lat ?: 0.0).append(',').append(pt?.lon ?: 0.0).append(',')
+            sb.append(d.altitude ?: 0.0).append(',').append(pt?.radius ?: 0f).append(',')
             sb.append(when (d.kind) { Kind.WIFI -> "WIFI"; Kind.BLE -> "BLE"; Kind.CELL -> d.band }).append('\n')
         }
         return sb.toString()
@@ -63,9 +95,10 @@ object Exporter {
 
     // ---- JSON ---------------------------------------------------------------------------------
 
-    fun json(devices: Collection<Device>, st: ScanStatus): String {
+    fun json(devices: Collection<Device>, st: ScanStatus, clean: Boolean = true): String {
         val root = JSONObject()
         root.put("tool", "Radar 0.2")
+        root.put("export_mode", if (clean) "propre" else "brut")
         root.put("exported", stamp.format(Date()))
         root.put("session_start", stamp.format(Date(st.sessionStart)))
         root.put("device", "${Build.MANUFACTURER} ${Build.MODEL} / Android ${Build.VERSION.RELEASE}")
@@ -87,8 +120,11 @@ object Exporter {
                     put("estimate", JSONObject().apply {
                         put("lat", e.lat ?: JSONObject.NULL); put("lon", e.lon ?: JSONObject.NULL); put("radius_m", e.radius)
                         put("observations", e.n); put("persistence", e.persistence.name); put("rtt_fix", e.rttFix)
+                        put("bearing_fix", e.bearingFix); put("locked", e.locked)
+                        put("method", point(d, e)?.method ?: JSONObject.NULL)
                         put("alt_rel_m", e.altM ?: JSONObject.NULL)
                     })
+                    put("quality", if (isClean(d, e)) "propre" else "bruit")
                 }
             })
         }
@@ -96,9 +132,52 @@ object Exporter {
         return root.toString(2)
     }
 
+    // ---- GeoJSON (QGIS) : points, cercles d'incertitude, trace ------------------------------------
+
+    fun geoJson(devices: Collection<Device>, trace: List<DoubleArray>): String {
+        val est = ScanRepository.estimates.value
+        val features = JSONArray()
+        for (d in devices) {
+            val pt = point(d, est[d.id]) ?: continue
+            val props = JSONObject().apply {
+                put("id", d.id); put("name", d.name); put("kind", d.kind.name); put("category", d.category.name)
+                put("vendor", d.vendor); put("rssi_best", d.bestRssi); put("band", d.band); put("security", d.security)
+                put("radius_m", pt.radius); put("method", pt.method); put("observations", pt.e?.n ?: 0)
+                put("persistence", pt.e?.persistence?.name ?: "UNKNOWN"); put("quality", if (isClean(d, pt.e)) "propre" else "bruit")
+                put("first_seen", stamp.format(Date(d.firstSeen))); put("last_seen", stamp.format(Date(d.lastSeen)))
+            }
+            features.put(JSONObject().apply {
+                put("type", "Feature"); put("properties", props)
+                put("geometry", JSONObject().apply { put("type", "Point"); put("coordinates", JSONArray().put(pt.lon).put(pt.lat)) })
+            })
+            features.put(JSONObject().apply {
+                put("type", "Feature"); put("properties", JSONObject().apply { put("id", d.id); put("layer", "incertitude"); put("radius_m", pt.radius) })
+                put("geometry", JSONObject().apply { put("type", "Polygon"); put("coordinates", JSONArray().put(circle(pt.lat, pt.lon, pt.radius.toDouble()))) })
+            })
+        }
+        if (trace.size >= 2) features.put(JSONObject().apply {
+            put("type", "Feature"); put("properties", JSONObject().apply { put("layer", "trace") })
+            put("geometry", JSONObject().apply {
+                put("type", "LineString")
+                put("coordinates", JSONArray().apply { for (p in trace) put(JSONArray().put(p[1]).put(p[0])) })
+            })
+        })
+        return JSONObject().apply { put("type", "FeatureCollection"); put("features", features) }.toString(2)
+    }
+
+    private fun circle(lat: Double, lon: Double, radiusM: Double): JSONArray {
+        val ring = JSONArray()
+        val kx = 111_320.0 * Math.cos(Math.toRadians(lat)); val ky = 111_320.0
+        for (i in 0..36) {
+            val a = Math.toRadians(i * 10.0)
+            ring.put(JSONArray().put(lon + radiusM * Math.sin(a) / kx).put(lat + radiusM * Math.cos(a) / ky))
+        }
+        return ring
+    }
+
     // ---- Débrief texte ------------------------------------------------------------------------
 
-    fun debrief(devices: Collection<Device>, st: ScanStatus): String {
+    fun debrief(devices: Collection<Device>, st: ScanStatus, clean: Boolean = true): String {
         val now = System.currentTimeMillis()
         val wifi = devices.filter { it.kind == Kind.WIFI }
         val ble = devices.filter { it.kind == Kind.BLE }
@@ -120,6 +199,8 @@ object Exporter {
         sb.appendLine("- Export : ${stamp.format(Date(now))}")
         sb.appendLine("- Durée : $durMin min · scans Wi-Fi : ${st.wifiScans}")
         sb.appendLine("- Appareil : ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}")
+        sb.appendLine("- Mode : ${if (clean) "PROPRE — seulement les objets à position confirmée (stationnaire / RTT / △ / 🔒, rayon ≤ ${CLEAN_MAX_RADIUS_M.toInt()} m)" else "BRUT — tout, y compris passants et MAC aléatoires"}")
+        sb.appendLine("- Positions = positions CALCULÉES (barycentre pondéré, RTT, triangulation), avec leur rayon d'incertitude")
         if (lats.isNotEmpty()) {
             sb.appendLine("- Zone couverte : lat ${"%.5f".format(lats.min())}→${"%.5f".format(lats.max())}, lon ${"%.5f".format(lons.min())}→${"%.5f".format(lons.max())}")
         } else sb.appendLine("- Zone couverte : pas de fix GPS pendant la session")
@@ -162,7 +243,7 @@ object Exporter {
         if (prio.isEmpty()) sb.appendLine("- aucun")
         prio.forEach { d ->
             sb.appendLine("- [${d.category.label}] ${d.kind.name} ${d.id} « ${d.name.ifBlank { "—" }} » ${d.vendorLong.ifBlank { "?" }} · ${d.bestRssi} dBm · ${d.band} · vu ${d.seenCount}× · 1er ${stamp.format(Date(d.firstSeen))}" +
-                (if (d.lat != null) " · @ ${"%.5f".format(d.lat)},${"%.5f".format(d.lon)}" else ""))
+                (point(d, estimates[d.id])?.let { " · @ ${"%.5f".format(it.lat)},${"%.5f".format(it.lon)} ±${it.radius.toInt()} m (${it.method})" } ?: ""))
         }
         sb.appendLine()
         sb.appendLine("## Signaux les plus forts (top 15)")

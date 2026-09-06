@@ -39,6 +39,7 @@ import ch.lab77.radar.export.Exporter
 import ch.lab77.radar.map.NetworkState
 import ch.lab77.radar.scan.SystemTweaks
 import androidx.compose.material3.Switch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 
@@ -65,12 +66,24 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
         )
         BatteryBanner(st)
         SettingsPanel(st, onQuit)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { Exporter.share(ctx, Exporter.fileName("csv"), "text/csv", Exporter.wigleCsv(all)) },
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Palette.bg)) { Text("CSV WiGLE") }
-            Button(onClick = { Exporter.share(ctx, Exporter.fileName("json"), "application/json", Exporter.json(all, st)) },
+        var clean by remember { mutableStateOf(true) }
+        val sel = Exporter.select(all, clean)
+        val trace by ScanRepository.trace.collectAsStateWithLifecycle()
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = clean, onCheckedChange = { clean = it })
+            Text(
+                if (clean) "Export PROPRE : ${sel.size}/${all.size} objets à position confirmée (positions calculées)" else "Export BRUT : tout (${all.size}), y compris passants et MAC aléatoires",
+                color = if (clean) Palette.green else Palette.amber, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(onClick = { Exporter.share(ctx, Exporter.fileName("csv"), "text/csv", Exporter.wigleCsv(sel)) },
+                colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Palette.bg)) { Text("CSV") }
+            Button(onClick = { Exporter.share(ctx, Exporter.fileName("geojson"), "application/geo+json", Exporter.geoJson(sel, trace)) },
+                colors = ButtonDefaults.buttonColors(containerColor = Palette.violet, contentColor = Palette.bg)) { Text("GeoJSON") }
+            Button(onClick = { Exporter.share(ctx, Exporter.fileName("json"), "application/json", Exporter.json(sel, st, clean)) },
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.blue, contentColor = Palette.bg)) { Text("JSON") }
-            Button(onClick = { Exporter.share(ctx, Exporter.fileName("md"), "text/plain", Exporter.debrief(all, st)) },
+            Button(onClick = { Exporter.share(ctx, Exporter.fileName("md"), "text/plain", Exporter.debrief(sel, st, clean)) },
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.amber, contentColor = Palette.bg)) { Text("Débrief") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

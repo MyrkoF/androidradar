@@ -10,7 +10,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * (chaque observation horodatée et géolocalisée, rattachée à une session), `session` (un lieu + une date),
  * `estimate` (position estimée + incertitude par émetteur et par session). Toutes les sessions s'accumulent.
  */
-class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 2) {
+class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -22,7 +22,7 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 2) {
         db.execSQL(
             """CREATE TABLE location (
                 _id INTEGER PRIMARY KEY AUTOINCREMENT, bssid TEXT, level INTEGER, lat REAL, lon REAL,
-                altitude REAL, accuracy REAL, time INTEGER, session_id INTEGER)"""
+                altitude REAL, accuracy REAL, time INTEGER, session_id INTEGER, bearing REAL)"""
         )
         db.execSQL("CREATE INDEX idx_loc_bssid ON location(bssid)")
         db.execSQL("CREATE INDEX idx_loc_time ON location(time)")
@@ -44,6 +44,7 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 2) {
             db.execSQL("ALTER TABLE location ADD COLUMN session_id INTEGER")
             createV2(db)
         }
+        if (oldVersion < 3) db.execSQL("ALTER TABLE location ADD COLUMN bearing REAL")
     }
 
     fun newSession(start: Long, name: String): Long {
@@ -75,6 +76,15 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 2) {
             }
             db.insert("location", null, lv)
         }
+    }
+
+    /** Observation de direction (guide de marche) : d'où, vers où. */
+    fun insertBearing(sessionId: Long, bssid: String, lat: Double, lon: Double, acc: Float, rssi: Int, bearing: Float, now: Long) {
+        val lv = ContentValues().apply {
+            put("bssid", bssid); put("level", rssi); put("lat", lat); put("lon", lon); put("accuracy", acc)
+            put("time", now); put("session_id", sessionId); put("bearing", bearing)
+        }
+        writableDatabase.insert("location", null, lv)
     }
 
     fun upsertEstimate(sessionId: Long, bssid: String, e: Estimate, now: Long) {

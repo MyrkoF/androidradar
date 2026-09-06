@@ -17,7 +17,15 @@ import android.os.PowerManager
 import android.os.SystemClock
 import ch.lab77.radar.MainActivity
 import ch.lab77.radar.R
+import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * Service de premier plan : garde les scanners vivants écran éteint. Un seul par process.
@@ -61,6 +69,7 @@ class ScanService : Service() {
     private var bleOn = false
     private var cellOn = false
     private val handler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var wifiGapReported = false
     private var bleGapReported = false
 
@@ -105,6 +114,15 @@ class ScanService : Service() {
         gps = GpsTracker(this)
         sensors = PhoneSensors(this)
         ScanRepository.setStatus { it.copy(sensors = sensors.availability(if (rtt.supported) rtt.available else false)) }
+        // Objet suivi dans le moniteur → rafale sur le capteur concerné (#12)
+        scope.launch {
+            ScanRepository.guideTarget.collect { id ->
+                val kind = id?.let { ScanRepository.devices.value[it]?.kind }
+                wifi.burst = kind == Kind.WIFI
+                cell.burst = kind == Kind.CELL
+                if (kind != null) ScanRepository.logLine("Rafale ${kind.name} pour $id")
+            }
+        }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "radar:scan")
     }
@@ -169,6 +187,7 @@ class ScanService : Service() {
     }
 
     override fun onDestroy() {
+        scope.cancel()
         handler.removeCallbacks(watchdog)
         wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop()
         SystemTweaks.restore(this)

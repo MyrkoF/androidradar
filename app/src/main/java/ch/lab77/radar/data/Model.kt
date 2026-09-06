@@ -30,6 +30,7 @@ data class Estimate(
     val altM: Float? = null,        // altitude barométrique relative au départ de session (étage probable)
     val rttFix: Boolean = false,    // position obtenue par trilatération de distances mesurées (Wi-Fi RTT)
     val locked: Boolean = false,    // 🔒 position figée : stationnaire, assez d'observations, rayon petit (cahier §3 ter)
+    val bearingFix: Boolean = false, // △ position obtenue par triangulation de directions (guide de marche, #12)
 )
 
 data class Device(

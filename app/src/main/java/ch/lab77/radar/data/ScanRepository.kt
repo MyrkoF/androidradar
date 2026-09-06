@@ -135,6 +135,38 @@ object ScanRepository {
     /** Derniers échantillons (60 s) d'un appareil, pour le guide de marche. */
     fun samplesOf(id: String): List<Sample> = synchronized(samples) { samples[id]?.toList() ?: emptyList() }
 
+    /** Objet suivi dans le moniteur : le service passe les capteurs en rafale pour lui (#12). */
+    private val _guideTarget = MutableStateFlow<String?>(null)
+    val guideTarget: StateFlow<String?> = _guideTarget.asStateFlow()
+    fun setGuideTarget(id: String?) { _guideTarget.value = id }
+
+    private val lastBearingAt = HashMap<String, Long>()
+
+    /**
+     * Direction trouvée par masquage corporel (rose des caps nette) : enregistrée comme observation depuis
+     * la position actuelle, au plus une par minute et par objet, puis position recalculée (triangulation).
+     */
+    fun addBearing(id: String, bearingDeg: Float, rssi: Int) {
+        io.execute {
+            val now = System.currentTimeMillis()
+            if (now - (lastBearingAt[id] ?: 0L) < 60_000) return@execute
+            val loc = location?.takeIf { now - it.time < 60_000 } ?: return@execute
+            val d = _devices.value[id] ?: return@execute
+            lastBearingAt[id] = now
+            val acc = if (loc.hasAccuracy()) loc.accuracy else 30f
+            synchronized(obsById) {
+                val list = obsById.getOrPut(id) { ArrayDeque() }
+                list.addLast(Obs(now, loc.latitude, loc.longitude, acc, rssi, _status.value.baroAltM, null, bearingDeg))
+                while (list.size > Estimator.MAX_OBS) list.removeFirst()
+            }
+            try { db?.insertBearing(_status.value.sessionId, id, loc.latitude, loc.longitude, acc, rssi, bearingDeg, now) } catch (_: Exception) {}
+            val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
+            val est = Estimator.estimate(obs, d.kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, d.kind), _estimates.value[id])
+            _estimates.update { it + (id to est) }
+            logLine("Direction $id : ${bearingDeg.toInt()}° depuis ma position" + (if (est.bearingFix) " → position triangulée ±${est.radius.toInt()} m" else ""))
+        }
+    }
+
     /** Observations géolocalisées d'un appareil — pour montrer sur la carte d'où il a été vu. */
     fun observationsOf(id: String): List<Obs> = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
 
@@ -195,7 +227,7 @@ object ScanRepository {
                 val fresh = rtt[id]?.first   // distance mesurée récente (RTT toutes les ~12 s)
                 val acc = if (loc.hasAccuracy()) loc.accuracy else 30f
                 val last = list.lastOrNull()
-                if (Estimator.samePlace(last, loc.latitude, loc.longitude)) {
+                if (Estimator.samePlace(last, loc.latitude, loc.longitude) && last!!.bearing == null) {
                     // (a) même endroit : on garde la meilleure lecture, sans empiler
                     list[list.lastIndex] = last!!.copy(t = now, rssi = maxOf(last.rssi, rssi), acc = minOf(last.acc, acc), rttM = fresh ?: last.rttM)
                 } else {
@@ -247,7 +279,7 @@ object ScanRepository {
     fun clearSession() {
         io.execute {
             try { db?.endSession(_status.value.sessionId, System.currentTimeMillis()) } catch (_: Exception) {}
-            synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear()
+            synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear(); lastBearingAt.clear()
             synchronized(samples) { samples.clear() }
             _devices.value = emptyMap()
             _estimates.value = emptyMap()

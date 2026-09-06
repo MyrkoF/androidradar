@@ -41,6 +41,7 @@ En BLE, la majorité des appareils vus sont des personnes en déplacement. La ca
 - Rejet des mesures absurdes : au-delà de 6 observations, celles à plus de 2× le rayon du barycentre sont ignorées.
 - Confiance au bon GPS : le poids d'une observation décroît avec la précision GPS (référence 10 m).
 - Le podomètre arbitre le mouvement du téléphone (§4 ter). Intérieur/extérieur : automatique seulement, pas de bouton.
+- Tout ce que le guide de marche demande sert à repréciser les positions (décision 2026-09-06, #12) : une direction nette (rose ≥ 8 secteurs, contraste ≥ 6 dB) devient une observation de direction ; deux directions depuis deux endroits distincts → triangulation, qui prime sur le barycentre quand elles se croisent proprement. Mode rafale des capteurs pendant le guide.
 
 ## 4. Fonctions v0.2 (périmètre fermé)
 

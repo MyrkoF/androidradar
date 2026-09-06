@@ -1,0 +1,3 @@
+- Guide de marche : mode rafale (Wi-Fi 3 s, cellules 5 s) quand un objet est dans le moniteur, fenêtre 90 s, compteur de mesures et consigne de vitesse
+- La direction trouvée en tournant sur soi-même est enregistrée et recalcule la position (triangulation « △ » dès deux directions depuis deux endroits)
+- Exports : positions calculées (plus la position du téléphone), mode propre/brut, export GeoJSON pour QGIS

@@ -1,0 +1,3 @@
+- Walk guide: burst mode (Wi-Fi 3 s, cells 5 s) while an object is in the monitor, 90 s window, sample counter and pacing hint
+- The direction found by turning around is recorded and refines the position (triangulation "△" from two bearings at two places)
+- Exports: computed positions (not the phone's), clean/raw mode, GeoJSON export for QGIS

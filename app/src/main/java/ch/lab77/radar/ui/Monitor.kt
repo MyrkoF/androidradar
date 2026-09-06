@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Estimate
 import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 
 /**
@@ -33,6 +35,11 @@ import ch.lab77.radar.data.ScanStatus
 @Composable
 fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
     var full by rememberSaveable { mutableStateOf(false) }
+    // Tant que le moniteur est ouvert, le service mesure cet objet en rafale (#12)
+    DisposableEffect(d.id) {
+        ScanRepository.setGuideTarget(d.id)
+        onDispose { ScanRepository.setGuideTarget(null) }
+    }
     Column(
         Modifier.widthIn(max = 300.dp).heightIn(max = 420.dp).background(Palette.surface.copy(alpha = 0.93f)).padding(8.dp)
             .verticalScroll(rememberScrollState()),
@@ -48,7 +55,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         }
         Text(
             "${d.rssi} dBm · ${d.kind.name} · ${d.category.label}" +
-                (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") + (if (it.locked) " · 🔒 stable" else "") } ?: " · pas encore positionné"),
+                (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") + (if (it.locked) " · 🔒 stable" else "") + (if (it.bearingFix) " · △ triangulé" else "") } ?: " · pas encore positionné"),
             color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
         WalkGuide(d, st, compact = !full)

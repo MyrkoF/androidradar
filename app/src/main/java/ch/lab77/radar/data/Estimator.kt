@@ -11,6 +11,7 @@ data class Obs(
     val t: Long, val lat: Double, val lon: Double, val acc: Float, val rssi: Int,
     val baroAlt: Float? = null,   // altitude barométrique relative du téléphone à cet instant
     val rttM: Float? = null,      // distance mesurée (Wi-Fi RTT) à cet instant, si disponible
+    val bearing: Float? = null,   // direction (cap vrai, ±30°) trouvée par masquage corporel depuis cette position (#12)
 )
 
 /**
@@ -73,7 +74,49 @@ object Estimator {
         return fresh.copy(locked = lockNow || fresh.rttFix)
     }
 
-    /** Barycentre pondéré (signal × précision GPS), ou trilatération RTT si possible. */
+    const val BEARING_MIN_SEP_M = 10.0
+    const val BEARING_MIN_ANGLE = 20.0
+
+    /**
+     * Triangulation sur les observations portant une direction : intersection aux moindres carrés des
+     * demi-droites (cap vrai depuis la position du téléphone). Retourne [lat, lon, résidu RMS en m] ou null
+     * si < 2 directions, positions trop proches (< 10 m) ou directions trop parallèles (< 20°).
+     */
+    fun triangulate(obs: List<Obs>, lat0: Double, lon0: Double): DoubleArray? {
+        val pts = obs.filter { it.bearing != null }
+        if (pts.size < 2 || spreadM(pts) < BEARING_MIN_SEP_M) return null
+        val angles = pts.map { it.bearing!!.toDouble() }
+        val maxDiff = angles.maxOf { a -> angles.maxOf { b -> val d = abs(a - b) % 360; if (d > 180) 360 - d else d } }
+        if (maxDiff < BEARING_MIN_ANGLE) return null
+        val kx = 111_320.0 * cos(Math.toRadians(lat0)); val ky = 111_320.0
+        // Chaque direction = droite (p, u) ; on minimise Σ |(x − p) × u|² → système 2×2
+        var a11 = 0.0; var a12 = 0.0; var a22 = 0.0; var b1 = 0.0; var b2 = 0.0
+        for (p in pts) {
+            val px = (p.lon - lon0) * kx; val py = (p.lat - lat0) * ky
+            val rad = Math.toRadians(p.bearing!!.toDouble())
+            val ux = kotlin.math.sin(rad); val uy = cos(rad)            // cap : 0° = nord (+y), 90° = est (+x)
+            val nx = uy; val ny = -ux                                   // normale
+            a11 += nx * nx; a12 += nx * ny; a22 += ny * ny
+            val c = nx * px + ny * py
+            b1 += nx * c; b2 += ny * c
+        }
+        val det = a11 * a22 - a12 * a12
+        if (abs(det) < 1e-9) return null
+        val x = (a22 * b1 - a12 * b2) / det; val y = (a11 * b2 - a12 * b1) / det
+        // Le point doit être DEVANT chaque observateur (demi-droite, pas droite) ; sinon on rejette
+        var s2 = 0.0
+        for (p in pts) {
+            val px = (p.lon - lon0) * kx; val py = (p.lat - lat0) * ky
+            val rad = Math.toRadians(p.bearing!!.toDouble())
+            val dx = x - px; val dy = y - py
+            if (dx * kotlin.math.sin(rad) + dy * cos(rad) < 0) return null
+            val perp = dx * cos(rad) - dy * kotlin.math.sin(rad)
+            s2 += perp * perp
+        }
+        return doubleArrayOf(lat0 + y / ky, lon0 + x / kx, sqrt(s2 / pts.size))
+    }
+
+    /** Barycentre pondéré (signal × précision GPS), ou trilatération RTT, ou triangulation de directions. */
     private fun raw(obs: List<Obs>, kind: Kind, persistence: Persistence): Estimate {
         var sw = 0.0; var slat = 0.0; var slon = 0.0; var salt = 0.0; var swAlt = 0.0
         for (o in obs) {
@@ -90,6 +133,12 @@ object Estimator {
         for (o in obs) { val w = weight(o.rssi, o.acc); val d = distanceM(lat, lon, o.lat, o.lon); sd2 += w * d * d; sacc += w * o.acc }
         val rms = sqrt(sd2 / sw); val acc = sacc / sw
         val radius = max(rms + acc, floorRadius(obs.maxOf { it.rssi }, kind).toDouble()).toFloat()
+        // Directions (guide de marche) : si elles se croisent proprement, elles priment sur le barycentre
+        val tri3 = triangulate(obs, lat, lon)
+        if (tri3 != null && tri3[2] < 40.0 && distanceM(lat, lon, tri3[0], tri3[1]) < radius * 1.5) {
+            val r = max(tri3[2] + acc, 10.0).toFloat()
+            return Estimate(tri3[0], tri3[1], kotlin.math.min(r, radius), obs.size, persistence, altM, bearingFix = true)
+        }
         return Estimate(lat, lon, radius, obs.size, persistence, altM)
     }
 
