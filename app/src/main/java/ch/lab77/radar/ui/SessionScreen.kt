@@ -83,6 +83,7 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
             )
         }
         item { BatteryBanner(st) }
+        item { ArStatusLine() }
         item { Section("Exports (CSV, GeoJSON, JSON, débrief, diagnostic)", openExports, { openExports = !openExports }) { ExportsPanel(all, st) } }
         item { Section("Sessions (reprendre, renommer, comparer deux visites, liste blanche)", openSessions, { openSessions = !openSessions; if (openSessions) ScanRepository.refreshSessions() }) { SessionsPanel(st, all.size) } }
         item { Section("Réglages (hauteur des yeux, limitation Wi-Fi, raccourcis, quitter)", openSettings, { openSettings = !openSettings }) { SettingsPanel(st, onQuit) } }

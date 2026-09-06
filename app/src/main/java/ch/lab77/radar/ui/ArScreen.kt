@@ -111,7 +111,7 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
             Column(Modifier.fillMaxWidth().align(Alignment.TopCenter).background(Palette.surface.copy(alpha = 0.85f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Suivi caméra (ARCore) : ${st.arTracking.ifBlank { info }}", color = if (st.arTracking.startsWith("suivi")) Palette.green else Palette.amber, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                 Text(
-                    if (!ready) "Google Play Services for AR : $info. Sans lui, cet écran ne sert à rien — le reste de l'app marche."
+                    if (!ready) "Prérequis : ${arState(ctx).label}. Sans ARCore, cet écran ne sert à rien — le reste de l'app marche (voir Session → prérequis)."
                     else "Gardez l'écran ouvert en marchant : votre position suit vos vrais déplacements (±1,5 m). Immobile = position figée.",
                     color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
                 )

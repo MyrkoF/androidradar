@@ -1,0 +1,1 @@
+- Session : prérequis ARCore détecté (prêt / à installer avec bouton Play Store / téléphone non compatible)
