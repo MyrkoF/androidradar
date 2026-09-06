@@ -1,14 +1,14 @@
-# Sonde — note de reprise de session
+# Radar — note de reprise de session
 
 Écrite le 2026-09-06 pour reprendre le travail dans une nouvelle session Cowork avec le dépôt GitHub attaché.
 
 ## Où en est le projet
 
-Sonde est une app Android (Kotlin / Jetpack Compose, package `org.equalium.sonde`, minSdk 26) de relevé RF passif Wi-Fi + BLE avec GPS, base SQLite au schéma WiGLE, classification par fabricant (table OUI Wireshark embarquée), exports CSV WiGLE 1.4 / JSON / débrief LLM. Version actuelle : **v0.1, jamais compilée ni exécutée**. ~1 340 lignes Kotlin, 16 fichiers.
+Radar est une app (ex-« Sonde ») Android (Kotlin / Jetpack Compose, package `ch.lab77.radar`, minSdk 26) de relevé RF passif Wi-Fi + BLE avec GPS, base SQLite au schéma WiGLE, classification par fabricant (table OUI Wireshark embarquée), exports CSV WiGLE 1.4 / JSON / débrief LLM. Version actuelle : **v0.1, jamais compilée ni exécutée**. ~1 340 lignes Kotlin, 16 fichiers.
 
-Le code vit dans le dossier connecté du PC tx01 : `~/DATA/Common documents/Projects/AndroidRadar/sonde/`. Il n'a jamais été poussé sur GitHub. Le dépôt `MyrkoF/androidradar` (public) existe, vide.
+Le code vit dans le dossier connecté du PC tx01 : `~/DATA/Common documents/Projects/AndroidRadar/sonde/ (désormais `radar/`)`. Il n'a jamais été poussé sur GitHub. Le dépôt `MyrkoF/androidradar` (public) existe, vide.
 
-Le cahier des charges v0.2 (rév. 4) est dans `sonde/docs/CAHIER_DES_CHARGES.md` et dans le projet Drone (`claude/Sonde_cahier_des_charges_v0.2.md`). Il est validé par Myrko ; c'est la boussole.
+Le cahier des charges v0.2 (rév. 4) est dans `docs/CAHIER_DES_CHARGES.md` et dans le projet Drone (`claude/Sonde_cahier_des_charges_v0.2.md`). Il est validé par Myrko ; c'est la boussole.
 
 ## Décisions prises (ne pas rouvrir)
 
@@ -18,12 +18,12 @@ Le cahier des charges v0.2 (rév. 4) est dans `sonde/docs/CAHIER_DES_CHARGES.md`
 - Téléphones de test : vivo X Fold 5 en premier, Xiaomi Redmi 14 ensuite. Pas de Play Services requis.
 - v0.3 : tête de sonde LoRa externe (LilyGO T-Beam, ESP32 + SX1262 + GPS) reliée en BLE, mode logger autonome sur site. Prévoir dès la v0.2 une interface `Sensor` commune (Wi-Fi interne, BLE interne, sonde externe → même `observe()`).
 - Méthode : cahier des charges d'une page + itérations courtes, une fonction par itération, APK testé sur téléphone entre chaque. Ordre : fiabilité → carte + marqueurs → mode marche + estimation → sessions + diff → GeoJSON.
-- Livraison APK : à chaque push sur `main`, le workflow publie une Release `latest` ; lien fixe `https://github.com/MyrkoF/androidradar/releases/download/latest/sonde-latest.apk`. Le workflow est déjà écrit (`.github/workflows/build.yml`).
+- Livraison APK : à chaque push sur `main`, le workflow publie une Release `latest` ; lien fixe `https://github.com/MyrkoF/androidradar/releases/download/latest/radar-latest.apk`. Le workflow est déjà écrit (`.github/workflows/build.yml`).
 - Myrko reproche à la v0.1 d'avoir été construite sans recueil du besoin : ne plus coder une fonction sans qu'elle soit dans le cahier des charges.
 
 ## Ce qui reste à faire, dans l'ordre
 
-1. Pousser le code sur `MyrkoF/androidradar` (branche `main`). Depuis la nouvelle session : stager le dossier `sonde/` depuis le PC, le copier dans le clone du dépôt, commit, push.
+1. Pousser le code sur `MyrkoF/androidradar` (branche `main`). Depuis la nouvelle session : stager le dossier `sonde/` (renommé `radar/`) depuis le PC, le copier dans le clone du dépôt, commit, push.
 2. Vérifier le premier build Actions. S'il casse, corriger la v0.1 telle quelle avant toute autre modification.
 3. Itération fiabilité : classifieur sans recoupements (aujourd'hui `teltonika`, `calamp`, `milesight`, `espressif` sont dans deux catégories, et `huawei`/`netgear`/`mikrotik` dépendent de sous-regex) ; mettre à jour `assets/oui.tsv` depuis le fichier `manuf` de Wireshark ; ajouter la détection de l'optimisation batterie et un guide dans l'écran Session ; rendre le service de scan résilient (relance s'il est tué — OriginOS et HyperOS sont agressifs).
 4. Premier test réel sur le vivo : Wi-Fi + BLE lancés, écran éteint 10 min, vérifier que le compteur monte et que le journal n'a pas de trou. Réglages vivo à faire avant : Options développeur → Limitation du scan Wi-Fi désactivée ; Batterie → consommation élevée en arrière-plan autorisée ; Infos de l'app → Batterie sans restriction ; Démarrage automatique activé ; app verrouillée dans les récents.

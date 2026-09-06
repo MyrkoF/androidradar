@@ -1,4 +1,4 @@
-# Sonde — relevé RF passif (Wi-Fi + BLE) pour Android
+# Radar — relevé RF passif (Wi-Fi + BLE) pour Android
 
 Outil terrain, hors ligne, sans permission Internet. Observe les métadonnées publiquement diffusées
 (balises Wi-Fi, annonces BLE), les horodate et les géolocalise, classe les fabricants, et exporte
@@ -10,7 +10,7 @@ Aucune interception de trafic. Aucune connexion aux appareils observés. Aucune 
 
 **Via GitHub Actions (aucun outillage local)**
 1. Créer un dépôt GitHub, y pousser ce dossier.
-2. Onglet *Actions* → workflow *Build APK* → l'APK est dans les artefacts (`sonde-debug-apk`).
+2. Onglet *Actions* → workflow *Build APK* → l'APK est dans les artefacts (`radar-debug-apk`).
 
 **Via Android Studio** : ouvrir le dossier, *Build → Build APK(s)*.
 
@@ -38,7 +38,7 @@ l'app affiche `throttle` quand elle est bridée et lit alors le cache système).
 - **Session** : exports (partage système → Drive, Signal, fichier…), journal, nouvelle session.
 
 Le CSV suit le format WiGLE 1.4 : importable sur wigle.net et lisible par les outils du même écosystème.
-La base SQLite locale (`sonde.db`, schéma inspiré de WiGLE) accumule toutes les sessions.
+La base SQLite locale (`radar.db`, schéma inspiré de WiGLE) accumule toutes les sessions.
 
 ## Classification
 

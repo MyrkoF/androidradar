@@ -1,4 +1,4 @@
-package org.equalium.sonde.scan
+package ch.lab77.radar.scan
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
@@ -7,8 +7,8 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
-import org.equalium.sonde.data.Kind
-import org.equalium.sonde.data.ScanRepository
+import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanRepository
 
 /** Scan BLE continu, indépendant du Wi-Fi. N'utilise que les données d'annonce (pas de connexion). */
 class BleScanner(ctx: Context) {

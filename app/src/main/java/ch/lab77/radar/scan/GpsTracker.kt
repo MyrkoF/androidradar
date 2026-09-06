@@ -1,4 +1,4 @@
-package org.equalium.sonde.scan
+package ch.lab77.radar.scan
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -7,7 +7,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
-import org.equalium.sonde.data.ScanRepository
+import ch.lab77.radar.data.ScanRepository
 
 /** Position via LocationManager natif (pas de Play Services : fonctionne sur GrapheneOS et sans Google). */
 class GpsTracker(ctx: Context) {

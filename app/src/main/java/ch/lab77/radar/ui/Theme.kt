@@ -1,11 +1,11 @@
-package org.equalium.sonde.ui
+package ch.lab77.radar.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import org.equalium.sonde.data.Category
-import org.equalium.sonde.data.Kind
+import ch.lab77.radar.data.Category
+import ch.lab77.radar.data.Kind
 
 object Palette {
     val bg = Color(0xFF0B1215)
@@ -48,6 +48,6 @@ private val scheme = darkColorScheme(
 )
 
 @Composable
-fun SondeTheme(content: @Composable () -> Unit) {
+fun RadarTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = scheme, content = content)
 }

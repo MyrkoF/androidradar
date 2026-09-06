@@ -1,4 +1,4 @@
-package org.equalium.sonde
+package ch.lab77.radar
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -9,10 +9,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import org.equalium.sonde.data.ScanRepository
-import org.equalium.sonde.scan.ScanService
-import org.equalium.sonde.ui.App
-import org.equalium.sonde.ui.SondeTheme
+import ch.lab77.radar.data.ScanRepository
+import ch.lab77.radar.scan.ScanService
+import ch.lab77.radar.ui.App
+import ch.lab77.radar.ui.RadarTheme
 
 class MainActivity : ComponentActivity() {
     private var pending: (() -> Unit)? = null
@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ScanRepository.init(this)
         setContent {
-            SondeTheme {
+            RadarTheme {
                 App(
                     onWifi = { on -> withPerms(wifiPerms()) { ScanService.send(this, if (on) ScanService.ACTION_WIFI_ON else ScanService.ACTION_WIFI_OFF) } },
                     onBle = { on -> withPerms(blePerms()) { ScanService.send(this, if (on) ScanService.ACTION_BLE_ON else ScanService.ACTION_BLE_OFF) } },

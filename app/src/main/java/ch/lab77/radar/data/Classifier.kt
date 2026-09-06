@@ -1,4 +1,4 @@
-package org.equalium.sonde.data
+package ch.lab77.radar.data
 
 /**
  * Classification par nom de fabricant. Volontairement lisible : une ligne par famille,

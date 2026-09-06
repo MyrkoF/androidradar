@@ -1,4 +1,4 @@
-package org.equalium.sonde.ui
+package ch.lab77.radar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,8 +28,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.equalium.sonde.data.Device
-import org.equalium.sonde.data.Kind
+import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.Kind
 
 private enum class Filter(val label: String) { ALL("Tous"), WIFI("Wi-Fi"), BLE("BLE"), PRIORITY("Prioritaires"), ACTIVE("Actifs") }
 

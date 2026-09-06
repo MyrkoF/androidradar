@@ -1,6 +1,6 @@
-# Sonde — cahier des charges v0.2 (boussole, une page)
+# Radar — cahier des charges v0.2 (boussole, une page)
 
-Statut : validé par Myrko (sections 1–9). Version : 2026-09-06 (rév. 4 : vivo en premier, tuiles sans infra).
+Statut : validé par Myrko (sections 1–9). Version : 2026-09-06 (rév. 5 : nom « Radar », package `ch.lab77.radar` — rév. 4 : vivo en premier, tuiles sans infra).
 
 ## 1. Finalité
 
@@ -13,7 +13,7 @@ Quatre usages, par ordre de priorité de conception :
 3. Inventaire d'un lieu : photographie RF à un instant T, diff entre deux visites.
 4. Exploration / apprentissage.
 
-## 2. Non-objectifs (ce que Sonde ne fera pas)
+## 2. Non-objectifs (ce que Radar ne fera pas)
 
 - Pas d'interception de trafic, pas de connexion aux appareils observés, pas de désauthentification.
 - Pas d'identification de personnes. Les MAC aléatoires restent aléatoires.

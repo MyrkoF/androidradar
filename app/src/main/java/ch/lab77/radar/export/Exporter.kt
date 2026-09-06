@@ -1,13 +1,13 @@
-package org.equalium.sonde.export
+package ch.lab77.radar.export
 
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.content.FileProvider
-import org.equalium.sonde.data.Category
-import org.equalium.sonde.data.Device
-import org.equalium.sonde.data.Kind
-import org.equalium.sonde.data.ScanStatus
+import ch.lab77.radar.data.Category
+import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanStatus
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -35,13 +35,13 @@ object Exporter {
         ctx.startActivity(Intent.createChooser(send, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    fun fileName(ext: String) = "sonde-${fileStamp.format(Date())}.$ext"
+    fun fileName(ext: String) = "radar-${fileStamp.format(Date())}.$ext"
 
     // ---- CSV WiGLE 1.4 ------------------------------------------------------------------------
 
     fun wigleCsv(devices: Collection<Device>): String {
         val sb = StringBuilder()
-        sb.append("WigleWifi-1.4,appRelease=sonde-0.1,model=${Build.MODEL},release=${Build.VERSION.RELEASE},")
+        sb.append("WigleWifi-1.4,appRelease=radar-0.1,model=${Build.MODEL},release=${Build.VERSION.RELEASE},")
         sb.append("device=${Build.DEVICE},display=${Build.DISPLAY},board=${Build.BOARD},brand=${Build.BRAND}\n")
         sb.append("MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n")
         for (d in devices.sortedBy { it.firstSeen }) {
@@ -63,7 +63,7 @@ object Exporter {
 
     fun json(devices: Collection<Device>, st: ScanStatus): String {
         val root = JSONObject()
-        root.put("tool", "Sonde 0.1")
+        root.put("tool", "Radar 0.1")
         root.put("exported", stamp.format(Date()))
         root.put("session_start", stamp.format(Date(st.sessionStart)))
         root.put("device", "${Build.MANUFACTURER} ${Build.MODEL} / Android ${Build.VERSION.RELEASE}")
@@ -96,7 +96,7 @@ object Exporter {
         val tz = TimeZone.getDefault().id
 
         val sb = StringBuilder()
-        sb.appendLine("# DÉBRIEF RELEVÉ RF — Sonde")
+        sb.appendLine("# DÉBRIEF RELEVÉ RF — Radar")
         sb.appendLine()
         sb.appendLine("Ce document est un instantané d'environnement radio passif (Wi-Fi + BLE), produit hors ligne.")
         sb.appendLine("Il ne contient aucune interception de trafic : uniquement des métadonnées diffusées publiquement.")

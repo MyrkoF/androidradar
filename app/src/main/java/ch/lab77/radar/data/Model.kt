@@ -1,4 +1,4 @@
-package org.equalium.sonde.data
+package ch.lab77.radar.data
 
 enum class Kind { WIFI, BLE }
 

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "org.equalium.sonde"
+    namespace = "ch.lab77.radar"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.equalium.sonde"
+        applicationId = "ch.lab77.radar"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

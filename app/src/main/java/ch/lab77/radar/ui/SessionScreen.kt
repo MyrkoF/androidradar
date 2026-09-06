@@ -1,4 +1,4 @@
-package org.equalium.sonde.ui
+package ch.lab77.radar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,11 +24,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.equalium.sonde.data.Device
-import org.equalium.sonde.data.Kind
-import org.equalium.sonde.data.ScanRepository
-import org.equalium.sonde.data.ScanStatus
-import org.equalium.sonde.export.Exporter
+import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanRepository
+import ch.lab77.radar.data.ScanStatus
+import ch.lab77.radar.export.Exporter
 
 @Composable
 fun SessionScreen(devices: Map<String, Device>, st: ScanStatus) {

@@ -1,4 +1,4 @@
-package org.equalium.sonde.scan
+package ch.lab77.radar.scan
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -9,8 +9,8 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import org.equalium.sonde.data.Kind
-import org.equalium.sonde.data.ScanRepository
+import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanRepository
 
 /**
  * Scan Wi-Fi périodique. Android 9+ limite les scans à 4 par 2 minutes pour une app au premier plan

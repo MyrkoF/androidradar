@@ -1,4 +1,4 @@
-package org.equalium.sonde.data
+package ch.lab77.radar.data
 
 import android.content.ContentValues
 import android.content.Context
@@ -10,7 +10,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * position) et une table `location` (chaque observation horodatée et géolocalisée). Toutes les sessions
  * s'accumulent ; l'export travaille sur une fenêtre temporelle.
  */
-class Db(ctx: Context) : SQLiteOpenHelper(ctx, "sonde.db", null, 1) {
+class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 1) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(

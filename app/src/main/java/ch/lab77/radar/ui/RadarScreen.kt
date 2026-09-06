@@ -1,4 +1,4 @@
-package org.equalium.sonde.ui
+package ch.lab77.radar.ui
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -24,8 +24,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.equalium.sonde.data.Category
-import org.equalium.sonde.data.Device
+import ch.lab77.radar.data.Category
+import ch.lab77.radar.data.Device
 import kotlin.math.cos
 import kotlin.math.sin
 

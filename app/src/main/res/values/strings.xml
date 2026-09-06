@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Sonde</string>
+    <string name="app_name">Radar</string>
     <string name="notif_channel">Relevé RF en cours</string>
 </resources>

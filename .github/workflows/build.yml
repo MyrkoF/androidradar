@@ -34,7 +34,7 @@ jobs:
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           SHORT=$(git rev-parse --short HEAD)
-          NAME="sonde-v${VERSION}-${SHORT}.apk"
+          NAME="radar-v${VERSION}-${SHORT}.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sonde-debug-apk
+          name: radar-debug-apk
           path: ${{ steps.apk.outputs.name }}
 
       # Sur main : publie l'APK en Release "latest" (lien direct, stable, sans compte GitHub).
@@ -52,9 +52,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp "${{ steps.apk.outputs.name }}" sonde-latest.apk
+          cp "${{ steps.apk.outputs.name }}" radar-latest.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest sonde-latest.apk "${{ steps.apk.outputs.name }}" \
+          gh release create latest radar-latest.apk "${{ steps.apk.outputs.name }}" \
             --prerelease \
-            --title "Sonde v${{ steps.apk.outputs.version }} (${{ steps.apk.outputs.short }})" \
+            --title "Radar v${{ steps.apk.outputs.version }} (${{ steps.apk.outputs.short }})" \
             --notes "Build automatique de main @ ${{ github.sha }}. Télécharger l'APK, autoriser les sources inconnues, sideload."

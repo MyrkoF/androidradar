@@ -1,4 +1,4 @@
-package org.equalium.sonde.ui
+package ch.lab77.radar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +31,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.equalium.sonde.data.ScanRepository
-import org.equalium.sonde.data.ScanStatus
+import ch.lab77.radar.data.ScanRepository
+import ch.lab77.radar.data.ScanStatus
 
 @Composable
 fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
@@ -68,7 +68,7 @@ fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
 private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
     Column(Modifier.fillMaxWidth().background(Palette.surface).padding(horizontal = 12.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("SONDE", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
+            Text("RADAR", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             Text("$count", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             Text(
                 if (st.gpsFix) "GPS ±${st.accuracy?.toInt() ?: 0}m" else "GPS —",

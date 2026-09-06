@@ -1,4 +1,4 @@
-package org.equalium.sonde.data
+package ch.lab77.radar.data
 
 import android.content.Context
 import android.location.Location

@@ -1,4 +1,4 @@
-package org.equalium.sonde.scan
+package ch.lab77.radar.scan
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,18 +12,18 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import org.equalium.sonde.MainActivity
-import org.equalium.sonde.R
-import org.equalium.sonde.data.ScanRepository
+import ch.lab77.radar.MainActivity
+import ch.lab77.radar.R
+import ch.lab77.radar.data.ScanRepository
 
 /** Service de premier plan : garde les scanners vivants écran éteint. Un seul par process. */
 class ScanService : Service() {
     companion object {
-        const val ACTION_WIFI_ON = "org.equalium.sonde.WIFI_ON"
-        const val ACTION_WIFI_OFF = "org.equalium.sonde.WIFI_OFF"
-        const val ACTION_BLE_ON = "org.equalium.sonde.BLE_ON"
-        const val ACTION_BLE_OFF = "org.equalium.sonde.BLE_OFF"
-        const val ACTION_STOP = "org.equalium.sonde.STOP"
+        const val ACTION_WIFI_ON = "ch.lab77.radar.WIFI_ON"
+        const val ACTION_WIFI_OFF = "ch.lab77.radar.WIFI_OFF"
+        const val ACTION_BLE_ON = "ch.lab77.radar.BLE_ON"
+        const val ACTION_BLE_OFF = "ch.lab77.radar.BLE_OFF"
+        const val ACTION_STOP = "ch.lab77.radar.STOP"
         private const val CHANNEL = "scan"
         private const val NOTIF_ID = 1
 
@@ -49,7 +49,7 @@ class ScanService : Service() {
         ble = BleScanner(this)
         gps = GpsTracker(this)
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "sonde:scan")
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "radar:scan")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -111,7 +111,7 @@ class ScanService : Service() {
         val text = "Relevé actif : ${parts.joinToString(" + ").ifBlank { "—" }} · ${ScanRepository.devices.value.size} appareils"
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_fg)
-            .setContentTitle("Sonde")
+            .setContentTitle("Radar")
             .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
