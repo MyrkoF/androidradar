@@ -77,8 +77,8 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
             Text("$count", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             val sats = if (st.satsVisible > 0) " ${st.satsUsed}/${st.satsVisible}sat" else ""
             Text(
-                (when { st.deadReckoning -> "ESTIME ±${st.accuracy?.toInt() ?: 0}m"; st.gpsFix -> "GPS ±${st.accuracy?.toInt() ?: 0}m"; else -> "GPS —" }) + sats,
-                color = when { st.deadReckoning -> Palette.amber; st.gpsFix -> Palette.green; else -> Palette.muted }, fontSize = 12.sp, fontFamily = FontFamily.Monospace
+                (when { st.deadReckoning -> "ESTIME ±${st.accuracy?.toInt() ?: 0}m"; st.gpsHeld -> "GPS ±${st.accuracy?.toInt() ?: 0}m ⏸"; st.gpsFix -> "GPS ±${st.accuracy?.toInt() ?: 0}m"; else -> "GPS —" }) + sats,
+                color = when { st.deadReckoning || st.gpsHeld -> Palette.amber; st.gpsFix -> Palette.green; else -> Palette.muted }, fontSize = 12.sp, fontFamily = FontFamily.Monospace
             )
             if (st.heading != null) Text("↑${st.heading.toInt()}°", color = Palette.text, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             if (st.baroAltM != null) Text("Δ${"%+.0f".format(st.baroAltM)}m", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)

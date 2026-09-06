@@ -99,6 +99,8 @@ data class ScanStatus(
     val pressureHpa: Float? = null,
     val baroAltM: Float? = null,    // altitude barométrique relative au départ de session
     val deadReckoning: Boolean = false,   // position actuelle = estime (pas + cap), pas un fix GPS
+    val gpsHeld: Boolean = false,         // dernier fix GPS rejeté (saut sans pas) : position tenue
+    val stepsKnown: Boolean = false,      // capteur de pas disponible et autorisé
     val steps: Int = 0,
     val sensors: String = "",       // disponibilité des capteurs, pour l'écran Session
     val sessionStart: Long = 0L,

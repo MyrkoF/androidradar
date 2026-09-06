@@ -40,7 +40,6 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     private var lastBaroPush = 0L
     private var steps = 0
     private var lastStepAt = 0L
-    private val lastRealFixAt: Long get() = ScanRepository.lastRealFixAt
 
     /** Résumé de disponibilité pour l'écran Session. */
     fun availability(rtt: Boolean?): String = buildString {
@@ -55,7 +54,8 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         running = true
         rotation?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         pressure?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-        try { stepDetector?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) } } catch (_: SecurityException) {}
+        val stepsOk = try { stepDetector?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) } ?: false } catch (_: SecurityException) { false }
+        ScanRepository.setStatus { it.copy(stepsKnown = stepsOk) }
         ScanRepository.logLine("Capteurs : " + availability(null).substringBefore(" · Wi-Fi"))
         return true
     }
@@ -121,18 +121,17 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         steps++
         val now = System.currentTimeMillis()
         lastStepAt = now
-        val st = ScanRepository.status.value
-        val loc = ScanRepository.location ?: return
-        val heading = st.heading ?: return
-        // Un fix GPS de moins de 20 s (même moyen) garde la main ; l'estime ne prend le relais qu'après
-        val gpsFresh = (!st.deadReckoning && now - loc.time < 20_000) || (st.deadReckoning && now - lastRealFixAt < 20_000)
         ScanRepository.setStatus { it.copy(steps = steps) }
-        if (gpsFresh) return
-        val p = Estimator.advance(loc.latitude, loc.longitude, heading, 0.72)
+        val st = ScanRepository.status.value
+        val heading = st.heading ?: return
+        val accepted = ScanRepository.acceptedFix ?: return
+        // Dehors avec un bon fix récent, le GPS mène ; en intérieur (précision > 30 m) ou sans fix, les pas mènent
+        if (!ch.lab77.radar.data.PositionFilter.stepsDrive(accepted, now)) return
+        val p = Estimator.advance(accepted.lat, accepted.lon, heading, 0.72)
         val est = Location("estime").apply {
             latitude = p[0]; longitude = p[1]
-            accuracy = (loc.accuracy + 0.3f).coerceAtMost(150f)
-            if (loc.hasAltitude()) altitude = loc.altitude
+            accuracy = (accepted.acc + 0.3f).coerceAtMost(150f)
+            ScanRepository.location?.takeIf { it.hasAltitude() }?.let { altitude = it.altitude }
             time = now; elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
         }
         ScanRepository.setLocation(est, estimated = true)

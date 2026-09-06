@@ -72,7 +72,7 @@ Fiabilité (préalable, non négociable)
 - **Cellulaire** (`TelephonyManager.allCellInfo`) : cellules LTE/5G (identifiants, RSRP/RSRQ, opérateur) relevées par position → couche de couverture cellulaire sur la carte, export. Une nouvelle cellule apparue = signalée (veille).
 - **Wi-Fi RTT** (802.11mc/az) : distance *mesurée* vers les AP qui le supportent ; marqués comme tels, distinguée de la distance *estimée*.
 - **Baromètre** : altitude relative → étage probable de l'émetteur en bâtiment.
-- **Estime** (podomètre + boussole) : prolonge la trace quand le GPS décroche en intérieur ; positions marquées « à l'estime », incertitude qui grandit avec les pas.
+- **Estime** (podomètre + boussole) : prolonge la trace quand le GPS décroche en intérieur ; positions marquées « à l'estime », incertitude qui grandit avec les pas. **Le podomètre arbitre le mouvement** (décision 2026-09-06, #10) : un fix GPS n'est un déplacement que s'il est cohérent avec les pas faits depuis le dernier point accepté ; sinon la position est tenue. Exception : GPS précis (≤ 20 m) et vitesse plausible (véhicule).
 - Exclus : BLE direction finding, UWB, sub-GHz (v0.3), micro, caméra.
 
 ## 5. Appareils cibles

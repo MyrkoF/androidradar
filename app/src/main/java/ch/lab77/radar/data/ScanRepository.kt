@@ -76,18 +76,38 @@ object ScanRepository {
     /** Position du téléphone. `estimated` = à l'estime (pas + cap), jamais confondue avec un fix GPS. */
     @Volatile var lastRealFixAt = 0L
         private set
+    /** Dernier point accepté (GPS filtré ou estime) — c'est lui que voient la trace et les observations. */
+    @Volatile var acceptedFix: PositionFilter.Fix? = null
+        private set
+    private var stepsAtAccepted = 0
 
+    /**
+     * Position du téléphone. Un fix GPS passe par `PositionFilter` (le podomètre arbitre) ; rejeté, la
+     * position est tenue. `estimated` = à l'estime (pas + cap), toujours acceptée, jamais confondue avec un fix.
+     */
     fun setLocation(loc: Location, estimated: Boolean = false) {
-        location = loc
-        if (!estimated) lastRealFixAt = System.currentTimeMillis()
-        _status.update {
-            it.copy(gpsFix = !estimated, deadReckoning = estimated, lat = loc.latitude, lon = loc.longitude,
-                altitude = if (loc.hasAltitude()) loc.altitude else null,
-                accuracy = if (loc.hasAccuracy()) loc.accuracy else null)
-        }
-        val last = _trace.value.lastOrNull()
-        if (last == null || Estimator.distanceM(last[0], last[1], loc.latitude, loc.longitude) >= 3.0) {
-            _trace.update { (it + doubleArrayOf(loc.latitude, loc.longitude)).takeLast(5000) }
+        val now = System.currentTimeMillis()
+        val st = _status.value
+        val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 50f, now)
+        val ok = estimated || PositionFilter.accept(acceptedFix, next, st.steps - stepsAtAccepted, st.stepsKnown)
+        if (!estimated) lastRealFixAt = now
+        if (ok) {
+            acceptedFix = next; stepsAtAccepted = st.steps
+            location = loc.also { it.time = now }
+            _status.update {
+                it.copy(gpsFix = !estimated, deadReckoning = estimated, gpsHeld = false, lat = loc.latitude, lon = loc.longitude,
+                    altitude = if (loc.hasAltitude()) loc.altitude else null, accuracy = next.acc)
+            }
+            val last = _trace.value.lastOrNull()
+            if (last == null || Estimator.distanceM(last[0], last[1], loc.latitude, loc.longitude) >= 3.0) {
+                _trace.update { (it + doubleArrayOf(loc.latitude, loc.longitude)).takeLast(5000) }
+            }
+        } else {
+            // Saut sans pas : on garde la position, on rafraîchit l'horodatage (fix toujours « frais ») et la précision
+            val held = acceptedFix ?: return
+            location = Location("tenu").apply { latitude = held.lat; longitude = held.lon; accuracy = maxOf(held.acc, next.acc); time = now }
+            acceptedFix = held.copy(t = now)
+            _status.update { it.copy(gpsFix = true, gpsHeld = true, deadReckoning = false, accuracy = next.acc) }
         }
     }
 
