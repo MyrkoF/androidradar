@@ -13,10 +13,13 @@
 
     <!-- Bluetooth (Android 12+ : une seule permission de scan) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- Sonde externe v0.3 : connexion BLE UART (docs/PROTOCOLE-SONDE.md) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- Caméra : aperçu avec réticule pour le télémètre par visée seulement (#18) ; aucune image enregistrée -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <!-- Podomètre (estime quand le GPS décroche, cahier §4 ter) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
@@ -65,6 +68,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- ARCore optionnel : l'app s'installe et fonctionne sans le service AR -->
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
 
         <service
             android:name=".scan.ScanService"

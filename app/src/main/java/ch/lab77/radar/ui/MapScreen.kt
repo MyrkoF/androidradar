@@ -81,6 +81,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     var panel by rememberSaveable { mutableStateOf(false) }
     var maxZoom by rememberSaveable { mutableStateOf(15) }
     var headUp by rememberSaveable { mutableStateOf(false) }
+    var manual by remember { mutableStateOf<LatLng?>(null) }
+    var arOpen by rememberSaveable { mutableStateOf(false) }
     var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     val estimates by ScanRepository.estimates.collectAsStateWithLifecycle()
     val trace by ScanRepository.trace.collectAsStateWithLifecycle()
@@ -112,6 +114,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             m.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) followMe = false
             }
+            m.addOnMapLongClickListener { ll -> manual = ll; true }
             m.addOnMapClickListener { ll ->
                 val pt: PointF = m.projection.toScreenLocation(ll)
                 val hit = m.queryRenderedFeatures(pt, "devices").firstOrNull()
@@ -207,9 +210,20 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 FilterChip(selected = headUp, enabled = st.heading != null, onClick = { headUp = !headUp; if (headUp) followMe = true }, label = { Text("Orienter") })
                 FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaires") })
                 FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Hors ligne") })
+                FilterChip(selected = arOpen, onClick = { arOpen = true }, label = { Text("📷 Caméra") })
+            }
+            if (arOpen) ArScreen(selected?.let { devices[it] }) { arOpen = false }
+            manual?.let { ll ->
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { manual = null },
+                    confirmButton = { androidx.compose.material3.TextButton(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
+                    dismissButton = { androidx.compose.material3.TextButton(onClick = { manual = null }) { Text("Annuler") } },
+                    title = { Text("Poser ma position ici ?") },
+                    text = { Text("Ancre en intérieur (±3 m) : les pas, la boussole et la caméra repartent de ce point ; un bon fix GPS reprendra la main dehors.") }
+                )
             }
             Text(
-                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue\n" +
+                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore · appui long = « Je suis ici »\n" +
                     "$placedCount posés · ● Wi-Fi ● BLE ● Cell · anneau rouge = à surveiller · estompé = indéterminé · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
                     MapConfig.ATTRIBUTION,
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace

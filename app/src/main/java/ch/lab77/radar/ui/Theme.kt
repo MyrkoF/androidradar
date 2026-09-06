@@ -31,11 +31,12 @@ fun categoryColor(c: Category): Color = when (c) {
     Category.ROUTER_AP -> Palette.blue
     Category.CONSUMER -> Palette.green
     Category.CELL_TOWER -> Palette.orange
+    Category.SUBGHZ -> Palette.violet
     Category.RANDOMIZED -> Palette.muted
     Category.UNKNOWN -> Palette.text
 }
 
-fun kindColor(k: Kind): Color = when (k) { Kind.WIFI -> Palette.green; Kind.BLE -> Palette.blue; Kind.CELL -> Palette.orange }
+fun kindColor(k: Kind): Color = when (k) { Kind.WIFI -> Palette.green; Kind.BLE -> Palette.blue; Kind.CELL -> Palette.orange; Kind.STATION -> Palette.text; Kind.LORA -> Palette.violet }
 
 private val scheme = darkColorScheme(
     primary = Palette.green,

@@ -64,6 +64,7 @@ class ScanService : Service() {
     private lateinit var gps: GpsTracker
     private lateinit var sensors: PhoneSensors
     private lateinit var rtt: RttRanger
+    private lateinit var probe: ExternalProbe
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiOn = false
     private var bleOn = false
@@ -113,6 +114,7 @@ class ScanService : Service() {
         cell = CellScanner(this)
         gps = GpsTracker(this)
         sensors = PhoneSensors(this)
+        probe = ExternalProbe(this)
         ScanRepository.sensorInventory = sensors.inventory()
         ScanRepository.setStatus { it.copy(sensors = sensors.availability(if (rtt.supported) rtt.available else false)) }
         // Objet suivi dans le moniteur → rafale sur le capteur concerné (#12)
@@ -158,13 +160,14 @@ class ScanService : Service() {
             SystemTweaks.onScanStart(this)
             gps.start()
             sensors.start()
+            probe.start()
             if (wakeLock?.isHeld == false) wakeLock?.acquire(6 * 60 * 60 * 1000L)
             updateNotification()
             handler.removeCallbacks(watchdog)
             handler.postDelayed(watchdog, WATCHDOG_MS)
         } else {
             handler.removeCallbacks(watchdog)
-            wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop()
+            wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop(); probe.stop()
             SystemTweaks.restore(this)
             if (wakeLock?.isHeld == true) wakeLock?.release()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -190,7 +193,7 @@ class ScanService : Service() {
     override fun onDestroy() {
         scope.cancel()
         handler.removeCallbacks(watchdog)
-        wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop()
+        wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop(); probe.stop()
         SystemTweaks.restore(this)
         if (wakeLock?.isHeld == true) wakeLock?.release()
         super.onDestroy()

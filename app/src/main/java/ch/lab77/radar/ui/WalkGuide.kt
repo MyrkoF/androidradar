@@ -74,7 +74,7 @@ fun WalkGuide(d: Device, st: ScanStatus, compact: Boolean = false) {
         injectedAt = now
         ScanRepository.addBearing(d.id, (best!! * 30).toFloat(), maxMean.toInt())
     }
-    val rate = when (d.kind) { Kind.WIFI -> if (st.wifiThrottled) "Wi-Fi bridé : 1 mesure / 30 s — désactivez la limitation (Session → Réglages)" else "Wi-Fi : 1 mesure / 3 s → un tour en ~60 s"; Kind.BLE -> "BLE : continu → un tour en ~20 s"; Kind.CELL -> "Cellule : 1 mesure / 5 s → un tour en ~90 s" }
+    val rate = when (d.kind) { Kind.WIFI -> if (st.wifiThrottled) "Wi-Fi bridé : 1 mesure / 30 s — désactivez la limitation (Session → Réglages)" else "Wi-Fi : 1 mesure / 3 s → un tour en ~60 s"; Kind.BLE -> "BLE : continu → un tour en ~20 s"; Kind.CELL -> "Cellule : 1 mesure / 5 s → un tour en ~90 s"; Kind.STATION, Kind.LORA -> "Sonde externe : au rythme de la sonde" }
 
     Column(Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (!compact) Text("Guide de marche", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp)

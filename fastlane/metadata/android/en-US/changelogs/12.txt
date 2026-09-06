@@ -1,0 +1,4 @@
+- ARCore camera tracking (optional, if "Google Play Services for AR" is installed): indoors your position follows your real movements to the centimetre; still = frozen; "Point the object" pins a sighted box exactly
+- "I am here": long-press the map to anchor your position indoors
+- External probe v0.3: BLE reception (documented protocol), LoRa / sub-GHz objects and Wi-Fi stations
+- Position: a fix without satellites can no longer claim precision

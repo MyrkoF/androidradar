@@ -78,14 +78,14 @@ object Exporter {
         sb.append("device=${Build.DEVICE},display=${Build.DISPLAY},board=${Build.BOARD},brand=${Build.BRAND}\n")
         sb.append("MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n")
         for (d in devices.sortedBy { it.firstSeen }) {
-            val auth = when (d.kind) { Kind.WIFI -> d.capabilities; Kind.BLE -> "Misc [BLE]"; Kind.CELL -> d.capabilities }
+            val auth = when (d.kind) { Kind.WIFI -> d.capabilities; Kind.BLE -> "Misc [BLE]"; else -> d.capabilities }
             sb.append(csv(d.id)).append(',').append(csv(d.name)).append(',').append(csv(auth)).append(',')
             sb.append(stamp.format(Date(d.firstSeen))).append(',')
             sb.append(d.channel).append(',').append(d.bestRssi).append(',')
             val pt = point(d, est[d.id])
             sb.append(pt?.lat ?: 0.0).append(',').append(pt?.lon ?: 0.0).append(',')
             sb.append(d.altitude ?: 0.0).append(',').append(pt?.radius ?: 0f).append(',')
-            sb.append(when (d.kind) { Kind.WIFI -> "WIFI"; Kind.BLE -> "BLE"; Kind.CELL -> d.band }).append('\n')
+            sb.append(when (d.kind) { Kind.WIFI -> "WIFI"; Kind.BLE -> "BLE"; Kind.CELL -> d.band; Kind.STATION -> "WIFI"; Kind.LORA -> "LORA" }).append('\n')
         }
         return sb.toString()
     }

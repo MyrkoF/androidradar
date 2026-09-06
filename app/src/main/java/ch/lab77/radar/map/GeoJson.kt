@@ -13,7 +13,7 @@ import org.maplibre.turf.TurfTransformation
 
 /** Construit les couches GeoJSON de la carte à partir de l'état du dépôt. Pur, sans référence à l'UI. */
 object GeoJson {
-    fun kindHex(k: Kind) = when (k) { Kind.WIFI -> "#3DDC97"; Kind.BLE -> "#5CB8FF"; Kind.CELL -> "#FF8A50" }
+    fun kindHex(k: Kind) = when (k) { Kind.WIFI -> "#3DDC97"; Kind.BLE -> "#5CB8FF"; Kind.CELL -> "#FF8A50"; Kind.STATION -> "#D9E4E8"; Kind.LORA -> "#B39DFF" }
 
     /** Appareils à poser sur la carte : ceux qui ont une position estimée, filtrés par persistance (cahier §3 bis). */
     fun placed(devices: Map<String, Device>, estimates: Map<String, Estimate>, showAll: Boolean, accepts: (Device) -> Boolean): List<Pair<Device, Estimate>> =

@@ -47,6 +47,8 @@ object Estimator {
         Kind.WIFI -> 10.0.pow((-40.0 - bestRssi) / 27.0).toFloat().coerceIn(3f, 300f)
         Kind.BLE -> 10.0.pow((-55.0 - bestRssi) / 27.0).toFloat().coerceIn(3f, 300f)
         Kind.CELL -> 10.0.pow((-40.0 - bestRssi) / 25.0).toFloat().coerceIn(50f, 5000f)   // RSRP : -90 ≈ 100 m, -110 ≈ 600 m
+        Kind.STATION -> 10.0.pow((-40.0 - bestRssi) / 27.0).toFloat().coerceIn(3f, 300f)
+        Kind.LORA -> 10.0.pow((-40.0 - bestRssi) / 22.0).toFloat().coerceIn(20f, 10_000f)     // LoRa porte loin : -120 ≈ 4 km
     }
 
     /**

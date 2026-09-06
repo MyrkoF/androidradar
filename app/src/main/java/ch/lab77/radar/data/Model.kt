@@ -1,6 +1,6 @@
 package ch.lab77.radar.data
 
-enum class Kind { WIFI, BLE, CELL }
+enum class Kind { WIFI, BLE, CELL, STATION, LORA }   // STATION et LORA viennent de la sonde externe (v0.3)
 
 /** Catégorie déduite du fabricant (OUI) et des métadonnées publiques. */
 enum class Category(val label: String, val priority: Int) {
@@ -12,6 +12,7 @@ enum class Category(val label: String, val priority: Int) {
     ROUTER_AP("Routeur Wi-Fi / box", 2),
     CONSUMER("Grand public", 1),
     CELL_TOWER("Cellule mobile", 0),
+    SUBGHZ("Sub-GHz / LoRa", 3),
     RANDOMIZED("MAC aléatoire", 0),
     UNKNOWN("Inconnu", 0);
 
@@ -60,6 +61,8 @@ data class Device(
     val band: String get() = when {
         kind == Kind.BLE -> "BLE"
         kind == Kind.CELL -> capabilities.substringAfter("tech=", "cell").substringBefore(' ')
+        kind == Kind.STATION -> "station"
+        kind == Kind.LORA -> if (frequency > 0) "${frequency / 1000}.${(frequency % 1000) / 100} MHz" else "sub-GHz"
         frequency < 3000 -> "2.4 GHz"
         frequency < 5900 -> "5 GHz"
         else -> "6 GHz"
@@ -106,6 +109,8 @@ data class ScanStatus(
     val stepsKnown: Boolean = false,      // capteur de pas disponible et autorisé
     val steps: Int = 0,
     val sensors: String = "",       // disponibilité des capteurs, pour l'écran Session
+    val probe: String = "",         // sonde externe : "" / "recherche" / "connectée Radar-TBeam-01 · 87 %"
+    val arTracking: String = "",    // suivi caméra ARCore : "" / "initialisation" / "suivi" / "perdu" / "indisponible"
     val sessionStart: Long = 0L,
     val sessionId: Long = 0L,
     val alertsOn: Boolean = true,

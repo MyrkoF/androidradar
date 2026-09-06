@@ -233,6 +233,36 @@ object ScanRepository {
         }
     }
 
+    /** Balayage RSSI sub-GHz de la sonde (occupation spectrale) : dernier niveau par fréquence. */
+    private val _sweep = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val sweep: StateFlow<Map<Long, Int>> = _sweep.asStateFlow()
+    fun sweep(freqHz: Long, rssi: Int) = _sweep.update { it + (freqHz to rssi) }
+
+    /** Position posée à la main (« Je suis ici », appui long sur la carte) : ancre en intérieur, ±3 m. */
+    fun setManualPosition(lat: Double, lon: Double) {
+        setLocation(Location("manuel").apply { latitude = lat; longitude = lon; accuracy = 3f; time = System.currentTimeMillis() }, estimated = true)
+        logLine("Position posée à la main : ${"%.5f".format(lat)}, ${"%.5f".format(lon)} ±3 m")
+    }
+
+    /** Position directe d'un objet (pointé à la caméra ARCore) : observation à poids maximal, verrouillée. */
+    fun pinPosition(id: String, lat: Double, lon: Double, acc: Float) {
+        io.execute {
+            val d = _devices.value[id] ?: return@execute
+            val now = System.currentTimeMillis()
+            synchronized(obsById) {
+                val list = obsById.getOrPut(id) { ArrayDeque() }
+                repeat(3) { list.addLast(Obs(now, lat, lon, acc, -30)) }   // trois lectures « à 1 m » : elles dominent le barycentre
+                while (list.size > Estimator.MAX_OBS) list.removeFirst()
+            }
+            try { db?.insertBearing(_status.value.sessionId, id, lat, lon, acc, -30, -1f, now) } catch (_: Exception) {}
+            val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
+            val est = Estimator.estimate(obs, d.kind, Persistence.STATIONARY, null).copy(persistence = Persistence.STATIONARY, locked = true)
+            _estimates.update { it + (id to est) }
+            try { db?.upsertEstimate(_status.value.sessionId, d, est, now) } catch (_: Exception) {}
+            logLine("Objet pointé $id : ${"%.5f".format(lat)}, ${"%.5f".format(lon)} ±${acc.toInt()} m — position figée")
+        }
+    }
+
     /** Observations géolocalisées d'un appareil — pour montrer sur la carte d'où il a été vu. */
     fun observationsOf(id: String): List<Obs> = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
 
@@ -266,7 +296,7 @@ object ScanRepository {
         kind: Kind, rawId: String, name: String?, rssi: Int, frequency: Int, capabilities: String,
         bleCompanyId: Int? = null, vendorOverride: String? = null, wifiStandard: String = "",
     ) {
-        when (kind) { Kind.WIFI -> lastWifiResultAt = System.currentTimeMillis(); Kind.BLE -> lastBleResultAt = System.currentTimeMillis(); Kind.CELL -> {} }
+        when (kind) { Kind.WIFI -> lastWifiResultAt = System.currentTimeMillis(); Kind.BLE -> lastBleResultAt = System.currentTimeMillis(); else -> {} }
         val headingNow = _status.value.heading
         io.execute {
             val id = rawId.uppercase()
@@ -288,7 +318,7 @@ object ScanRepository {
                 vendor = v?.let { Oui.displayName(it.long, it.short) } ?: company ?: ""
                 vendorLong = v?.long ?: company ?: ""
             }
-            val category = prev?.category ?: if (kind == Kind.CELL) Category.CELL_TOWER else Classifier.classify(vendorLong, kind, id)
+            val category = prev?.category ?: when (kind) { Kind.CELL -> Category.CELL_TOWER; Kind.LORA -> Category.SUBGHZ; else -> Classifier.classify(vendorLong, kind, id) }
             val displayName = name?.takeIf { it.isNotBlank() } ?: prev?.name ?: ""
 
             val d = if (prev == null) Device(

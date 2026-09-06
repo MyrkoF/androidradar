@@ -264,7 +264,7 @@ object Classifier {
 
     fun classify(vendorLong: String, kind: Kind, mac: String): Category {
         if (vendorLong.isBlank()) {
-            return if (kind == Kind.WIFI && Oui.isLocallyAdministered(mac)) Category.RANDOMIZED
+            return if ((kind == Kind.WIFI || kind == Kind.STATION) && Oui.isLocallyAdministered(mac)) Category.RANDOMIZED
             else if (kind == Kind.BLE && Oui.bleAddressType(mac) != "publique/non-résolvable") Category.RANDOMIZED
             else Category.UNKNOWN
         }

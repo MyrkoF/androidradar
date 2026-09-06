@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
     private fun allPerms(): List<String> = listOf(
         Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.NEARBY_WIFI_DEVICES,
-        Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.ACTIVITY_RECOGNITION,
+        Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACTIVITY_RECOGNITION,
     )
 
     /** Sortie propre (issue #9) : arrête les relevés, restaure les réglages système, ferme l'app. */

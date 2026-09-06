@@ -61,11 +61,14 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         )
         val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
         var aiming by rememberSaveable { mutableStateOf(false) }
+        var ar by rememberSaveable { mutableStateOf(false) }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
+            TextButton(onClick = { ar = true }) { Text("📷 Pointer") }
             TextButton(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }
         }
         if (aiming) RangeFinderScreen(d, st) { aiming = false }
+        if (ar) ArScreen(d) { ar = false }
         WalkGuide(d, st, compact = !full)
         if (full) {
             if (e != null && e.lat != null) Text(

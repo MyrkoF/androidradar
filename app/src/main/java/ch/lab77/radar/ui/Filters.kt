@@ -49,7 +49,7 @@ object ViewFilter {
 private val shortLabel = mapOf(
     Category.CELLULAR_ROUTER to "Routeur cellulaire", Category.NETWORK_INFRA to "Infra réseau", Category.CAMERA to "Caméra",
     Category.INDUSTRIAL to "Industriel / IoT", Category.FLEET to "Flotte / télématique", Category.ROUTER_AP to "Routeur Wi-Fi / box",
-    Category.CONSUMER to "Grand public", Category.CELL_TOWER to "Cellule mobile", Category.RANDOMIZED to "MAC aléatoire", Category.UNKNOWN to "Inconnu",
+    Category.CONSUMER to "Grand public", Category.CELL_TOWER to "Cellule mobile", Category.SUBGHZ to "Sub-GHz / LoRa", Category.RANDOMIZED to "MAC aléatoire", Category.UNKNOWN to "Inconnu",
 )
 
 /** Bouton discret ⚙ qui ouvre le menu de filtres à cocher. À placer à droite de la barre de chaque vue. */

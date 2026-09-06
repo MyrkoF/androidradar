@@ -1,0 +1,4 @@
+- Suivi caméra ARCore (optionnel, si « Google Play Services for AR » est installé) : en intérieur, votre position suit vos vrais déplacements au centimètre ; immobile = position figée ; « Pointer l'objet » fixe la position exacte d'un boîtier visé
+- « Je suis ici » : appui long sur la carte pour ancrer sa position en intérieur
+- Sonde externe v0.3 : réception BLE (protocole documenté), objets LoRa / sub-GHz et stations Wi-Fi
+- Position : un fix sans satellites ne peut plus se prétendre précis

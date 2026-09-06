@@ -12,8 +12,8 @@ android {
         applicationId = "ch.lab77.radar"
         minSdk = 33
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.2.6"
+        versionCode = 12
+        versionName = "0.2.7"
     }
 
     signingConfigs {
@@ -78,5 +78,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
+    // ARCore optionnel (#16, décision Myrko) : suivi caméra en intérieur, « pointer l'objet ». L'app marche sans.
+    implementation("com.google.ar:core:1.56.0")
     testImplementation("junit:junit:4.13.2")
 }

@@ -82,6 +82,8 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
             )
             if (st.heading != null) Text("↑${st.heading.toInt()}°", color = Palette.text, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             if (st.baroAltM != null) Text("Δ${"%+.0f".format(st.baroAltM)}m", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            if (st.arTracking.startsWith("suivi")) Text("📷", fontSize = 12.sp)
+            if (st.probe.startsWith("connectée")) Text("⚡sonde", color = Palette.violet, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             if (st.wifiOn && st.wifiThrottled)
                 Text("throttle", color = Palette.amber, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
