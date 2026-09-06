@@ -90,3 +90,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" "radar-v${{ steps.apk.outputs.version }}.apk" \
             --title "Radar v${{ steps.apk.outputs.version }}" \
             --notes-file "$NOTES"
+          # Ne garder que la dernière version publiée (décision Myrko 2026-09-06 : les anciennes polluent).
+          for old in $(gh release list --json tagName --jq '.[].tagName' | grep '^v' | grep -v "^$GITHUB_REF_NAME$"); do
+            gh release delete "$old" --yes --cleanup-tag || true
+          done

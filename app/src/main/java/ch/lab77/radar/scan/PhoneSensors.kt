@@ -28,7 +28,33 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     private val rotation = sm.getDefaultSensor(HwSensor.TYPE_ROTATION_VECTOR)
     private val pressure = sm.getDefaultSensor(HwSensor.TYPE_PRESSURE)
     private val stepDetector = sm.getDefaultSensor(HwSensor.TYPE_STEP_DETECTOR)
+    private val accel = sm.getDefaultSensor(HwSensor.TYPE_ACCELEROMETER)
+    private val gyro = sm.getDefaultSensor(HwSensor.TYPE_GYROSCOPE)
     private var running = false
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    // Agrégats par seconde pour le diagnostic (« la totale », #13)
+    private var gyroSum = 0.0; private var gyroMax = 0f; private var gyroN = 0
+    private var accSum = 0.0; private var accMax = 0f; private var accN = 0
+    private var headingAcc = -1
+    private var lastPressure: Float? = null
+    private val oneHz = object : Runnable {
+        override fun run() {
+            if (!running) return
+            val st = ScanRepository.status.value
+            ScanRepository.recordSensors(ScanRepository.SensorRow(
+                System.currentTimeMillis(), st.heading, headingAcc,
+                if (gyroN > 0) (gyroSum / gyroN).toFloat() else 0f, gyroMax,
+                if (accN > 0) (accSum / accN).toFloat() else 0f, accMax,
+                lastPressure, st.baroAltM, steps, st.accuracy, st.satsUsed, st.satsVisible, st.deadReckoning,
+            ))
+            gyroSum = 0.0; gyroMax = 0f; gyroN = 0; accSum = 0.0; accMax = 0f; accN = 0
+            handler.postDelayed(this, 1000)
+        }
+    }
+
+    /** Inventaire des capteurs physiques du téléphone (diagnostic). */
+    fun inventory(): List<String> = sm.getSensorList(HwSensor.TYPE_ALL).map { "${it.name} (type ${it.type}, ${it.vendor})" }
     override val isRunning: Boolean get() = running
 
     private val rot = FloatArray(9)
@@ -46,6 +72,7 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         append("boussole ").append(if (rotation != null) "✓" else "✗")
         append(" · baromètre ").append(if (pressure != null) "✓" else "✗")
         append(" · podomètre ").append(if (stepDetector != null) "✓" else "✗")
+        append(" · gyro ").append(if (gyro != null) "✓" else "✗")
         append(" · Wi-Fi RTT ").append(when (rtt) { true -> "✓"; false -> "✗ (matériel)"; null -> "?" })
     }
 
@@ -56,6 +83,9 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         pressure?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
         val stepsOk = try { stepDetector?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) } ?: false } catch (_: SecurityException) { false }
         ScanRepository.setStatus { it.copy(stepsKnown = stepsOk) }
+        accel?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
+        gyro?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
+        handler.postDelayed(oneHz, 1000)
         ScanRepository.logLine("Capteurs : " + availability(null).substringBefore(" · Wi-Fi"))
         return true
     }
@@ -63,6 +93,7 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     override fun stop() {
         if (!running) return
         running = false
+        handler.removeCallbacks(oneHz)
         sm.unregisterListener(this)
         ScanRepository.setStatus { it.copy(heading = null, deadReckoning = false) }
     }
@@ -70,13 +101,17 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     /** Nouvelle session : la pression de référence repart de zéro. */
     fun resetBaseline() { p0 = null; steps = 0 }
 
-    override fun onAccuracyChanged(sensor: HwSensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: HwSensor?, accuracy: Int) {
+        if (sensor?.type == HwSensor.TYPE_ROTATION_VECTOR) headingAcc = accuracy   // 0 = à recalibrer (mouvement en 8), 3 = haute
+    }
 
     override fun onSensorChanged(e: SensorEvent) {
         when (e.sensor.type) {
             HwSensor.TYPE_ROTATION_VECTOR -> onRotation(e)
             HwSensor.TYPE_PRESSURE -> onPressure(e.values[0])
             HwSensor.TYPE_STEP_DETECTOR -> onStep()
+            HwSensor.TYPE_ACCELEROMETER -> { val m = kotlin.math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]); accSum += m; accN++; if (m > accMax) accMax = m }
+            HwSensor.TYPE_GYROSCOPE -> { val m = kotlin.math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]); gyroSum += m; gyroN++; if (m > gyroMax) gyroMax = m }
         }
     }
 
@@ -109,6 +144,7 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     }
 
     private fun onPressure(hpa: Float) {
+        lastPressure = hpa
         if (p0 == null) p0 = hpa
         val now = SystemClock.elapsedRealtime()
         if (now - lastBaroPush < 1000) return

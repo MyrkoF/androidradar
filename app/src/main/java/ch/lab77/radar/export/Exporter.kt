@@ -132,6 +132,71 @@ object Exporter {
         return root.toString(2)
     }
 
+    // ---- Diagnostic : tout ce qu'il faut pour rejouer une session (pour la session de développement) ----
+
+    fun diagnostic(ctx: Context, devices: Collection<Device>, st: ScanStatus): String {
+        val root = JSONObject()
+        val pkg = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0) } catch (_: Exception) { null }
+        root.put("tool", "Radar ${pkg?.versionName ?: "?"} (code ${pkg?.longVersionCode ?: 0})")
+        root.put("exported", stamp.format(Date()))
+        root.put("device", "${Build.MANUFACTURER} ${Build.MODEL} / Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+        root.put("permissions", JSONObject().apply {
+            for (perm in listOf("ACCESS_FINE_LOCATION", "NEARBY_WIFI_DEVICES", "BLUETOOTH_SCAN", "ACTIVITY_RECOGNITION", "POST_NOTIFICATIONS", "WRITE_SECURE_SETTINGS"))
+                put(perm, ctx.checkSelfPermission("android.permission.$perm") == android.content.pm.PackageManager.PERMISSION_GRANTED)
+        })
+        root.put("wifi_throttle_enabled", ch.lab77.radar.scan.SystemTweaks.throttleEnabled(ctx) ?: JSONObject.NULL)
+        root.put("status", JSONObject().apply {
+            put("session_start", stamp.format(Date(st.sessionStart))); put("session_id", st.sessionId)
+            put("wifi_on", st.wifiOn); put("ble_on", st.bleOn); put("cell_on", st.cellOn); put("wifi_throttled", st.wifiThrottled); put("wifi_scans", st.wifiScans)
+            put("gps_fix", st.gpsFix); put("gps_held", st.gpsHeld); put("dead_reckoning", st.deadReckoning); put("accuracy", st.accuracy ?: JSONObject.NULL)
+            put("sats_used", st.satsUsed); put("sats_visible", st.satsVisible); put("heading", st.heading ?: JSONObject.NULL)
+            put("pressure_hpa", st.pressureHpa ?: JSONObject.NULL); put("baro_alt_m", st.baroAltM ?: JSONObject.NULL)
+            put("steps", st.steps); put("steps_known", st.stepsKnown); put("sensors", st.sensors)
+        })
+        root.put("journal", JSONArray().apply { for ((t, line) in ScanRepository.logHistory()) put(JSONObject().put("t", stamp.format(Date(t))).put("line", line)) })
+        root.put("positions", JSONArray().apply {
+            for (e in ScanRepository.posHistory()) put(JSONObject().apply {
+                put("t", stamp.format(Date(e.t))); put("source", e.source); put("lat", e.lat); put("lon", e.lon); put("acc", e.acc)
+                put("accepted", e.accepted); put("steps_since", e.stepsSince); put("heading", e.heading ?: JSONObject.NULL); put("reason", e.reason)
+            })
+        })
+        root.put("trace_points", ScanRepository.trace.value.size)
+        root.put("sensor_inventory", JSONArray(ScanRepository.sensorInventory))
+        root.put("sensors_1hz", JSONArray().apply {
+            for (r in ScanRepository.sensorHistory()) put(JSONObject().apply {
+                put("t", stamp.format(Date(r.t))); put("heading", r.heading ?: JSONObject.NULL); put("heading_accuracy", r.headingAcc)
+                put("gyro_mean_rad_s", r.gyroMean); put("gyro_max_rad_s", r.gyroMax); put("accel_mean_m_s2", r.accelMean); put("accel_max_m_s2", r.accelMax)
+                put("pressure_hpa", r.pressureHpa ?: JSONObject.NULL); put("baro_alt_m", r.baroAltM ?: JSONObject.NULL); put("steps", r.steps)
+                put("gps_acc", r.gpsAcc ?: JSONObject.NULL); put("sats_used", r.satsUsed); put("sats_visible", r.satsVisible); put("dead_reckoning", r.deadReckoning)
+            })
+        })
+        val est = ScanRepository.estimates.value
+        root.put("devices", JSONArray().apply {
+            for (d in devices.sortedByDescending { it.seenCount }) put(JSONObject().apply {
+                put("id", d.id); put("kind", d.kind.name); put("name", d.name); put("vendor_long", d.vendorLong); put("category", d.category.name)
+                put("rssi_best", d.bestRssi); put("seen_count", d.seenCount); put("first_seen", stamp.format(Date(d.firstSeen))); put("last_seen", stamp.format(Date(d.lastSeen)))
+                put("rtt_capable", d.rttCapable); put("rtt_m", d.rttM ?: JSONObject.NULL); put("wifi_standard", d.wifiStandard)
+                est[d.id]?.let { e -> put("estimate", JSONObject().apply {
+                    put("lat", e.lat ?: JSONObject.NULL); put("lon", e.lon ?: JSONObject.NULL); put("radius_m", e.radius); put("observations", e.n)
+                    put("persistence", e.persistence.name); put("method", point(d, e)?.method ?: JSONObject.NULL); put("locked", e.locked); put("rtt_fix", e.rttFix); put("bearing_fix", e.bearingFix)
+                }) }
+                put("observations", JSONArray().apply {
+                    for (o in ScanRepository.observationsOf(d.id)) put(JSONObject().apply {
+                        put("t", stamp.format(Date(o.t))); put("lat", o.lat); put("lon", o.lon); put("acc", o.acc); put("rssi", o.rssi)
+                        put("baro_alt", o.baroAlt ?: JSONObject.NULL); put("rtt_m", o.rttM ?: JSONObject.NULL); put("bearing", o.bearing ?: JSONObject.NULL)
+                    })
+                })
+            })
+        })
+        ScanRepository.guideTarget.value?.let { id ->
+            root.put("guide_target", id)
+            root.put("guide_samples", JSONArray().apply {
+                for (x in ScanRepository.samplesOf(id)) put(JSONObject().put("t", stamp.format(Date(x.t))).put("rssi", x.rssi).put("heading", x.heading ?: JSONObject.NULL))
+            })
+        }
+        return root.toString(1)
+    }
+
     // ---- GeoJSON (QGIS) : points, cercles d'incertitude, trace ------------------------------------
 
     fun geoJson(devices: Collection<Device>, trace: List<DoubleArray>): String {

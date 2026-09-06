@@ -19,6 +19,8 @@ désinstaller une version antérieure avant d'installer une version signée.
   **et** `latest` recréé avec le même APK, lien fixe
   `https://github.com/MyrkoF/androidradar/releases/download/latest/radar-latest.apk`.
   C'est ce canal que suivent IzzyOnDroid et F-Droid.
+- **Une seule version publiée à la fois** : à chaque tag, la CI supprime les releases et tags `v*` précédents
+  (décision Myrko 2026-09-06). L'historique reste dans git ; les anciens APK ne sont pas conservés.
 
 ## Publier une version
 1. Bumper `versionCode` (+1) et `versionName` dans `app/build.gradle.kts`.

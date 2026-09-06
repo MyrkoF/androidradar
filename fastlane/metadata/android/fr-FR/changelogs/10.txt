@@ -1,0 +1,1 @@
+- Session → « Diagnostic » : export complet pour l'analyse (journal horodaté, historique des positions acceptées/rejetées, observations de chaque objet, capteurs bruts à 1 Hz : cap, gyroscope, accéléromètre, pression, pas, GPS, inventaire des capteurs)

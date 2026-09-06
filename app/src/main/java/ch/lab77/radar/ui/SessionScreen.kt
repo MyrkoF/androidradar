@@ -88,6 +88,7 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { ScanRepository.clearSession() }) { Text("Nouvelle session") }
+            OutlinedButton(onClick = { Exporter.share(ctx, Exporter.fileName("diag.json"), "application/json", Exporter.diagnostic(ctx, all, st)) }) { Text("Diagnostic") }
             val counts = ScanRepository.db()?.let { runCatching { it.counts() }.getOrNull() }
             if (counts != null) Text(
                 "Base : ${counts.first} appareils, ${counts.second} positions",

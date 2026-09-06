@@ -113,6 +113,7 @@ class ScanService : Service() {
         cell = CellScanner(this)
         gps = GpsTracker(this)
         sensors = PhoneSensors(this)
+        ScanRepository.sensorInventory = sensors.inventory()
         ScanRepository.setStatus { it.copy(sensors = sensors.availability(if (rtt.supported) rtt.available else false)) }
         // Objet suivi dans le moniteur → rafale sur le capteur concerné (#12)
         scope.launch {

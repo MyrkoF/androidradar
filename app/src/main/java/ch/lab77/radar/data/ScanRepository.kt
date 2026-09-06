@@ -89,8 +89,11 @@ object ScanRepository {
         val now = System.currentTimeMillis()
         val st = _status.value
         val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 50f, now, estimated)
-        val ok = estimated || PositionFilter.accept(acceptedFix, next, st.steps - stepsAtAccepted, st.stepsKnown)
+        val stepsSince = st.steps - stepsAtAccepted
+        val ok = estimated || PositionFilter.accept(acceptedFix, next, stepsSince, st.stepsKnown)
         if (!estimated) lastRealFixAt = now
+        recordPos(PosEvent(now, if (estimated) "estime" else loc.provider ?: "gps", loc.latitude, loc.longitude, next.acc, ok, stepsSince, st.heading,
+            when { estimated -> "pas + cap"; ok -> "accepté"; else -> "rejeté : ${acceptedFix?.let { "saut de ${Estimator.distanceM(it.lat, it.lon, loc.latitude, loc.longitude).toInt()} m pour $stepsSince pas (tenu ±${it.acc.toInt()} m${if (it.estimated) ", estime" else ""})" } ?: "?"}" }))
         if (ok) {
             acceptedFix = next; stepsAtAccepted = st.steps
             location = loc.also { it.time = now }
@@ -170,7 +173,30 @@ object ScanRepository {
     /** Observations géolocalisées d'un appareil — pour montrer sur la carte d'où il a été vu. */
     fun observationsOf(id: String): List<Obs> = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
 
-    fun logLine(s: String) { _log.tryEmit(s) }
+    /** Journal complet horodaté (diagnostic) — l'écran n'en montre que les 200 dernières lignes. */
+    private val logHistory = ArrayDeque<Pair<Long, String>>()
+    fun logLine(s: String) {
+        _log.tryEmit(s)
+        synchronized(logHistory) { logHistory.addLast(System.currentTimeMillis() to s); while (logHistory.size > 2000) logHistory.removeFirst() }
+    }
+    fun logHistory(): List<Pair<Long, String>> = synchronized(logHistory) { logHistory.toList() }
+
+    /** Capteurs bruts agrégés à 1 Hz (diagnostic) : cap, gyroscope, accéléromètre, pression, pas, GPS. */
+    data class SensorRow(
+        val t: Long, val heading: Float?, val headingAcc: Int, val gyroMean: Float, val gyroMax: Float,
+        val accelMean: Float, val accelMax: Float, val pressureHpa: Float?, val baroAltM: Float?, val steps: Int,
+        val gpsAcc: Float?, val satsUsed: Int, val satsVisible: Int, val deadReckoning: Boolean,
+    )
+    @Volatile var sensorInventory: List<String> = emptyList()
+    private val sensorHistory = ArrayDeque<SensorRow>()
+    fun sensorHistory(): List<SensorRow> = synchronized(sensorHistory) { sensorHistory.toList() }
+    fun recordSensors(r: SensorRow) = synchronized(sensorHistory) { sensorHistory.addLast(r); while (sensorHistory.size > 7200) sensorHistory.removeFirst() }
+
+    /** Historique des positions (diagnostic) : chaque fix, accepté ou non, et chaque pas à l'estime. */
+    data class PosEvent(val t: Long, val source: String, val lat: Double, val lon: Double, val acc: Float, val accepted: Boolean, val stepsSince: Int, val heading: Float?, val reason: String)
+    private val posHistory = ArrayDeque<PosEvent>()
+    fun posHistory(): List<PosEvent> = synchronized(posHistory) { posHistory.toList() }
+    private fun recordPos(e: PosEvent) = synchronized(posHistory) { posHistory.addLast(e); while (posHistory.size > 3000) posHistory.removeFirst() }
 
     /** Point d'entrée unique des scanners. Thread-safe par sérialisation sur `io`. */
     fun observe(
