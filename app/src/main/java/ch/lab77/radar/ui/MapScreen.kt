@@ -85,7 +85,6 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     var headUp by rememberSaveable { mutableStateOf(false) }
     var manual by remember { mutableStateOf<LatLng?>(null) }
     var arOpen by rememberSaveable { mutableStateOf(false) }
-    var thumb by rememberSaveable { mutableStateOf(false) }
     var aimOpen by rememberSaveable { mutableStateOf(false) }
     var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     val estimates by ScanRepository.estimates.collectAsStateWithLifecycle()
@@ -197,7 +196,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-            if (thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) {
+            if (CameraUse.thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) {
                 CameraThumb { if (selected != null) aimOpen = true else arOpen = true }
             }
             val aimDev = selected?.let { devices[it] }
@@ -220,7 +219,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaires") })
                 FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Hors ligne") })
                 FilterChip(selected = arOpen, onClick = { arOpen = true }, label = { Text("📷 Caméra") })
-                FilterChip(selected = thumb, onClick = { thumb = !thumb }, label = { Text("Vignette") })
+                FilterChip(selected = CameraUse.thumb, onClick = { CameraUse.thumb = !CameraUse.thumb }, label = { Text("Vignette") })
             }
             if (arOpen) ArScreen(selected?.let { devices[it] }) { arOpen = false }
             manual?.let { ll ->

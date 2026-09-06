@@ -153,11 +153,15 @@ object ScanRepository {
         val trusted = estimated || (loc.provider == "gps" && st.satsUsed >= 4)
         val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (trusted) rawAcc else maxOf(rawAcc, 40f), now, estimated)
         val stepsSince = st.steps - stepsAtAccepted
-        val ok = estimated || PositionFilter.accept(acceptedFix, next, stepsSince, st.stepsKnown)
+        var ok = estimated || PositionFilter.accept(acceptedFix, next, stepsSince, st.stepsKnown)
+        var reanchored = false
+        if (!ok && trusted && next.acc <= 30f && PositionFilter.agreeAndReanchor(next)) { ok = true; reanchored = true }
+        if (ok) PositionFilter.resetAgreement()
         if (!estimated) lastRealFixAt = now
         recordPos(PosEvent(now, if (estimated) "estime" else (loc.provider ?: "gps") + (if (trusted) "" else " (non fiable, ${st.satsUsed} sat)"), loc.latitude, loc.longitude, next.acc, ok, stepsSince, st.heading,
-            when { estimated -> "pas + cap"; ok -> "accepté"; else -> "rejeté : ${acceptedFix?.let { "saut de ${Estimator.distanceM(it.lat, it.lon, loc.latitude, loc.longitude).toInt()} m pour $stepsSince pas (tenu ±${it.acc.toInt()} m${if (it.estimated) ", estime" else ""})" } ?: "?"}" }))
+            when { estimated -> "pas + cap"; reanchored -> "réancré : 3 fixes fiables d'accord contre la position tenue"; ok -> "accepté"; else -> "rejeté : ${acceptedFix?.let { "saut de ${Estimator.distanceM(it.lat, it.lon, loc.latitude, loc.longitude).toInt()} m pour $stepsSince pas (tenu ±${it.acc.toInt()} m${if (it.estimated) ", estime" else ""})" } ?: "?"}" }))
         if (ok) {
+            if (reanchored) logLine("!! Position réancrée sur le GPS (${next.acc.toInt()} m) : la position tenue était fausse de ${acceptedFix?.let { Estimator.distanceM(it.lat, it.lon, next.lat, next.lon).toInt() } ?: 0} m")
             acceptedFix = next; stepsAtAccepted = st.steps
             location = loc.also { it.time = now }
             _status.update {

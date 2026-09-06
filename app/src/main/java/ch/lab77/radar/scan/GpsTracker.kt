@@ -34,7 +34,8 @@ class GpsTracker(ctx: Context) {
         for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
             try {
                 if (lm.isProviderEnabled(p)) {
-                    lm.getLastKnownLocation(p)?.let { ScanRepository.setLocation(it) }
+                    // Une « dernière position connue » périmée (l'appartement, 1,4 km plus loin) empoisonnait le filtre : 30 s max
+                    lm.getLastKnownLocation(p)?.takeIf { System.currentTimeMillis() - it.time < 30_000 }?.let { ScanRepository.setLocation(it) }
                     lm.requestLocationUpdates(p, 2_000L, 2f, listener, Looper.getMainLooper())
                 }
             } catch (_: Exception) {}

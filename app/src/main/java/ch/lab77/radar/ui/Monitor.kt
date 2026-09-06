@@ -1,6 +1,7 @@
 package ch.lab77.radar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +46,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         onDispose { ScanRepository.setGuideTarget(null) }
     }
     Column(
-        Modifier.widthIn(max = 300.dp).heightIn(max = 420.dp).background(Palette.surface.copy(alpha = 0.93f)).padding(8.dp)
+        Modifier.widthIn(max = 300.dp).heightIn(max = 420.dp).background(Palette.surface2.copy(alpha = 0.97f)).border(1.dp, Palette.green).padding(8.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

@@ -44,6 +44,24 @@ class PositionFilterTest {
         assertFalse(PositionFilter.accept(fix(0.0, 45f, 0), fix(60.0, 40f, 10_000), stepsSince = 0, stepsKnown = true))
     }
 
+    @Test fun `majorite de fixes frais contre une position tenue fausse`() {
+        // retour terrain n°7 : position tenue précise mais à 1,4 km ; trois vrais fixes d'accord entre eux
+        PositionFilter.resetAgreement()
+        val held = fix(0.0, 16f, 0)
+        val far1 = fix(1420.0, 16f, 5_000); val far2 = fix(1425.0, 20f, 10_000); val far3 = fix(1418.0, 18f, 15_000)
+        assertFalse(PositionFilter.accept(held, far1, 3, true))
+        assertFalse(PositionFilter.agreeAndReanchor(far1))
+        assertFalse(PositionFilter.agreeAndReanchor(far2))
+        assertTrue(PositionFilter.agreeAndReanchor(far3))
+        // des fixes qui ne s'accordent pas entre eux ne réancrent pas
+        PositionFilter.resetAgreement()
+        assertFalse(PositionFilter.agreeAndReanchor(fix(1000.0, 16f, 0)))
+        assertFalse(PositionFilter.agreeAndReanchor(fix(2000.0, 16f, 5_000)))
+        assertFalse(PositionFilter.agreeAndReanchor(fix(3000.0, 16f, 10_000)))
+        // rien d'accepté depuis > 60 s : un bon fix réancre directement
+        assertTrue(PositionFilter.accept(held, fix(1420.0, 16f, 70_000), 3, true))
+    }
+
     @Test fun `premier fix et fix inutilisable`() {
         assertTrue(PositionFilter.accept(null, fix(0.0, 30f, 0), 0, true))
         assertFalse(PositionFilter.accept(fix(0.0, 30f, 0), fix(0.0, 150f, 5_000), 0, true))

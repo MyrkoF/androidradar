@@ -1,0 +1,3 @@
+- Position: no more start on a stale location; three agreeing trusted GPS fixes re-anchor; a good fix re-anchors after 60 s without one
+- Radar: bigger dots, larger touch area, zoom down to -95…-100 dBm; higher-contrast monitor
+- Camera thumbnail shared by map and radar

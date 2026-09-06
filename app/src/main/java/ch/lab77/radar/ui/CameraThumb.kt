@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 /** Une seule utilisation de la caméra à la fois : les écrans Viser / AR le déclarent, la vignette s'efface. */
 object CameraUse {
     var busy by mutableStateOf(false)
+    var thumb by mutableStateOf(false)      // vignette activée — commune à la carte et au radar
 }
 
 /**

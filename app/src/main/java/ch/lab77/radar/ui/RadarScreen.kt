@@ -52,7 +52,7 @@ import kotlin.math.sin
  * tap sur un point → fiche détail. Le radar tient toujours dans l'écran.
  */
 private const val EDGE_DBM = -100f          // le bord ne bouge pas : c'est le centre que le zoom repousse
-private const val CENTER_MIN = -85f         // zoom max : la bande -85…-100 remplit le disque
+private const val CENTER_MIN = -95f         // zoom max : la bande -95…-100 remplit le disque
 private const val CENTER_MAX = -30f
 private const val CURVE = 1.4
 
@@ -64,7 +64,6 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
     )
     var center by rememberSaveable { mutableFloatStateOf(CENTER_MAX) }   // dBm au centre ; le bord est fixe à -100
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    var thumb by rememberSaveable { mutableStateOf(false) }
     var aimOpen by rememberSaveable { mutableStateOf(false) }
     val span = center - EDGE_DBM
     val active = devices.values.filter { it.ageMs < 120_000 && ViewFilter.accepts(it) }
@@ -75,13 +74,13 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
             OutlinedButton(onClick = { center = (center + 10f).coerceAtMost(CENTER_MAX) }, enabled = center < CENTER_MAX) { Text("−") }
             OutlinedButton(onClick = { center = (center - 10f).coerceAtLeast(CENTER_MIN) }, enabled = center > CENTER_MIN) { Text("+") }
             Text("fenêtre ${center.toInt()}…${EDGE_DBM.toInt()} dBm · ${visible.size}/${active.size}", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { thumb = !thumb }) { Text("📷") }
+            OutlinedButton(onClick = { CameraUse.thumb = !CameraUse.thumb }) { Text("📷") }
             FilterMenu()
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             val sel = selected?.let { devices[it] }
             if (sel != null) Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { Monitor(sel, null, st) { selected = null } }
-            if (thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { CameraThumb { if (sel != null) aimOpen = true } }
+            if (CameraUse.thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { CameraThumb { if (sel != null) aimOpen = true } }
             if (aimOpen && sel != null) RangeFinderScreen(sel, st) { aimOpen = false }
             Canvas(
                 Modifier.fillMaxSize()
@@ -93,7 +92,7 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                             val c = Offset(size.width / 2f, size.height / 2f)
                             val r = minOf(size.width, size.height) / 2f - 10.dp.toPx()
                             val hit = visible.minByOrNull { (pointFor(it, c, r, center) - pos).getDistance() }
-                            selected = if (hit != null && (pointFor(hit, c, r, center) - pos).getDistance() < 28.dp.toPx()) hit.id else null
+                            selected = if (hit != null && (pointFor(hit, c, r, center) - pos).getDistance() < 36.dp.toPx()) hit.id else null
                         }
                     }
             ) {
@@ -122,7 +121,7 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                     val p = pointFor(d, c, r, center)
                     val col = kindColor(d.kind)
                     val alpha = if (d.ageMs < 30_000) 1f else 0.45f
-                    val dotR = if (d.category.isPriority) 6.dp.toPx() else 4.dp.toPx()
+                    val dotR = if (d.category.isPriority) 8.dp.toPx() else 6.dp.toPx()
                     if (d.id == selected) drawCircle(Palette.text, dotR + 5.dp.toPx(), p, style = Stroke(2.dp.toPx()))
                     drawCircle(col.copy(alpha = alpha), dotR, p)
                     if (d.category.isPriority) drawCircle(Palette.red.copy(alpha = alpha), dotR + 3.dp.toPx(), p, style = Stroke(2.dp.toPx()))

@@ -20,9 +20,33 @@ object PositionFilter {
      * @param stepsSince pas comptés depuis `prev`
      * @param stepsKnown false si le capteur de pas n'existe pas ou est refusé
      */
+    const val STALE_MS = 60_000L
+    const val AGREE_M = 50.0
+    const val AGREE_COUNT = 3
+
+    /** Fixes fiables rejetés récemment : si plusieurs se confirment entre eux, c'est la position tenue qui est fausse. */
+    private val rejectedTrusted = ArrayDeque<Fix>()
+
+    /**
+     * Un fix GPS fiable (≥ 4 satellites) rejeté est mis en attente ; dès que AGREE_COUNT fixes consécutifs
+     * s'accordent à AGREE_M près, la majorité gagne et le dernier est accepté (réancrage). Retour terrain n°7 :
+     * une « dernière position connue » périmée à 1,4 km tenait tête à 11 vrais fixes.
+     */
+    fun agreeAndReanchor(next: Fix): Boolean {
+        rejectedTrusted.addLast(next)
+        while (rejectedTrusted.size > AGREE_COUNT) rejectedTrusted.removeFirst()
+        if (rejectedTrusted.size < AGREE_COUNT) return false
+        val first = rejectedTrusted.first()
+        val ok = rejectedTrusted.all { Estimator.distanceM(first.lat, first.lon, it.lat, it.lon) <= AGREE_M }
+        if (ok) rejectedTrusted.clear()
+        return ok
+    }
+    fun resetAgreement() = rejectedTrusted.clear()
+
     fun accept(prev: Fix?, next: Fix, stepsSince: Int, stepsKnown: Boolean): Boolean {
         if (next.acc > 100f) return prev == null            // fix inutilisable, sauf si on n'a rien
         if (prev == null) return true
+        if (!next.estimated && next.acc <= 30f && next.t - prev.t > STALE_MS) return true   // rien d'accepté depuis > 60 s : un bon fix réancre
         // Un fix nettement plus précis que ce qu'on tient le remplace toujours — sinon l'estime, dont
         // l'incertitude grandit à chaque pas, rejetterait le GPS qui pourrait la corriger (retour terrain n°4).
         if (prev.estimated && next.acc <= GOOD_ACC_M) return true

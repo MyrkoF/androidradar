@@ -1,0 +1,3 @@
+- Position : plus de démarrage sur une position périmée ; trois fixes GPS fiables d'accord entre eux réancrent la position ; un bon fix réancre après 60 s sans fix
+- Radar : points plus gros, zone de toucher élargie, zoom jusqu'à -95…-100 dBm ; moniteur contrasté
+- Vignette caméra commune à la carte et au radar
