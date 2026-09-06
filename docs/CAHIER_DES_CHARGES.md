@@ -18,7 +18,7 @@ Quatre usages, par ordre de priorité de conception :
 - Pas d'interception de trafic, pas de connexion aux appareils observés, pas de désauthentification.
 - Pas d'identification de personnes. Les MAC aléatoires restent aléatoires.
 - Pas de direction (azimut) déduite du RSSI. Un signal ne porte pas d'angle.
-- Pas de dépendance à Google Play Services, pas de compte, pas de télémétrie.
+- Pas de dépendance à Google Play Services, pas de compte, pas de télémétrie. **Exception décidée le 2026-09-06 (#16)** : ARCore (« Google Play Services for AR », gratuit) en module optionnel pour le suivi de position caméra en intérieur et « pointer l'objet » ; l'app fonctionne intégralement sans. OpenCV écarté.
 
 ## 3. Contrainte physique à accepter : la précision de position
 
@@ -82,7 +82,8 @@ Fiabilité (préalable, non négociable)
 - **Wi-Fi RTT** (802.11mc/az) : distance *mesurée* vers les AP qui le supportent ; marqués comme tels, distinguée de la distance *estimée*.
 - **Baromètre** : altitude relative → étage probable de l'émetteur en bâtiment.
 - **Estime** (podomètre + boussole) : prolonge la trace quand le GPS décroche en intérieur ; positions marquées « à l'estime », incertitude qui grandit avec les pas. **Le podomètre arbitre le mouvement** (décision 2026-09-06, #10) : un fix GPS n'est un déplacement que s'il est cohérent avec les pas faits depuis le dernier point accepté ; sinon la position est tenue. Exception : GPS précis (≤ 20 m) et vitesse plausible (véhicule).
-- Exclus : BLE direction finding, UWB, sub-GHz (v0.3), micro, caméra.
+- Caméra (décision 2026-09-06, #16, après sessions/diff) : télémètre par visée (hauteur des yeux réglable, inclinaison → distance, sans bibliothèque) ; ARCore optionnel (suivi au cm en intérieur, « pointer l'objet »). v0.4 : petit modèle de détection d'image (LiteRT) pour reconnaître box/caméras/antennes.
+- Exclus : BLE direction finding, UWB, sub-GHz (v0.3), micro.
 
 ## 5. Appareils cibles
 
