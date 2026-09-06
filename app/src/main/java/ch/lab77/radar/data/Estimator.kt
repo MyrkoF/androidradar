@@ -22,9 +22,24 @@ data class Obs(
  */
 object Estimator {
     const val MAX_OBS = 400
+    const val MIN_MOVE_M = 3.0          // (a) une mesure par endroit
+    const val LOCK_MIN_OBS = 8          // (b) verrou
+    const val LOCK_MAX_RADIUS_M = 30f
+    const val LOCK_RATE = 0.1           // sous verrou, une nouvelle estimation ne déplace que de 10 %
+    const val OUTLIER_MIN_OBS = 6       // (c) rejet des aberrantes
+    const val OUTLIER_FACTOR = 2.0
+    const val ACC_REF_M = 10.0          // (d) confiance au bon GPS
 
-    /** Poids d'une observation : +20 dB = ×10. Un passage près de l'émetteur domine les mesures lointaines. */
-    fun weight(rssi: Int): Double = 10.0.pow((rssi.coerceIn(-100, -30) + 100) / 20.0)
+    /** Poids d'une observation : +20 dB = ×10 (un passage près de l'émetteur domine), et moins de poids quand le GPS est imprécis. */
+    fun weight(rssi: Int, acc: Float = ACC_REF_M.toFloat()): Double {
+        val signal = 10.0.pow((rssi.coerceIn(-100, -30) + 100) / 20.0)
+        val gps = (ACC_REF_M / acc.toDouble().coerceAtLeast(ACC_REF_M)).pow(2)
+        return signal * gps
+    }
+
+    /** (a) Une mesure par endroit : garder la meilleure lecture tant que le téléphone n'a pas bougé de 3 m. */
+    fun samePlace(last: Obs?, lat: Double, lon: Double): Boolean =
+        last != null && distanceM(last.lat, last.lon, lat, lon) < MIN_MOVE_M
 
     /** Distance minimale plausible d'après le meilleur signal (perte en espace libre — ordre de grandeur). */
     fun floorRadius(bestRssi: Int, kind: Kind): Float = when (kind) {
@@ -33,21 +48,46 @@ object Estimator {
         Kind.CELL -> 10.0.pow((-40.0 - bestRssi) / 25.0).toFloat().coerceIn(50f, 5000f)   // RSRP : -90 ≈ 100 m, -110 ≈ 600 m
     }
 
-    fun estimate(obs: List<Obs>, kind: Kind, persistence: Persistence): Estimate {
+    /**
+     * Estimation complète. `prev` = estimation précédente : si elle est verrouillée (b), la nouvelle ne la
+     * déplace que de LOCK_RATE — beaucoup de mesures contraires finissent par la déplacer, une seule non.
+     */
+    fun estimate(obs: List<Obs>, kind: Kind, persistence: Persistence, prev: Estimate? = null): Estimate {
         if (obs.isEmpty()) return Estimate(null, null, 0f, 0, persistence)
+        var fresh = raw(obs, kind, persistence)
+        // (c) rejet des aberrantes : recalcul sans les observations à plus de 2× le rayon du barycentre
+        if (obs.size >= OUTLIER_MIN_OBS && fresh.lat != null && !fresh.rttFix) {
+            val limit = max(fresh.radius.toDouble() * OUTLIER_FACTOR, 20.0)
+            val kept = obs.filter { distanceM(fresh.lat!!, fresh.lon!!, it.lat, it.lon) <= limit }
+            if (kept.size >= 3 && kept.size < obs.size) fresh = raw(kept, kind, persistence).copy(n = obs.size)
+        }
+        // (b) verrou
+        val lockNow = persistence == Persistence.STATIONARY && fresh.n >= LOCK_MIN_OBS && fresh.radius < LOCK_MAX_RADIUS_M && fresh.lat != null
+        if (prev != null && prev.locked && prev.lat != null && fresh.lat != null && !fresh.rttFix) {
+            return prev.copy(
+                lat = prev.lat + LOCK_RATE * (fresh.lat - prev.lat), lon = prev.lon!! + LOCK_RATE * (fresh.lon!! - prev.lon),
+                radius = (prev.radius + LOCK_RATE * (fresh.radius - prev.radius)).toFloat(),
+                n = fresh.n, persistence = persistence, altM = fresh.altM ?: prev.altM, locked = true,
+            )
+        }
+        return fresh.copy(locked = lockNow || fresh.rttFix)
+    }
+
+    /** Barycentre pondéré (signal × précision GPS), ou trilatération RTT si possible. */
+    private fun raw(obs: List<Obs>, kind: Kind, persistence: Persistence): Estimate {
         var sw = 0.0; var slat = 0.0; var slon = 0.0; var salt = 0.0; var swAlt = 0.0
         for (o in obs) {
-            val w = weight(o.rssi); sw += w; slat += w * o.lat; slon += w * o.lon
+            val w = weight(o.rssi, o.acc); sw += w; slat += w * o.lat; slon += w * o.lon
             if (o.baroAlt != null) { salt += w * o.baroAlt; swAlt += w }
         }
-        var lat = slat / sw; var lon = slon / sw
+        val lat = slat / sw; val lon = slon / sw
         val altM = if (swAlt > 0) (salt / swAlt).toFloat() else null
         val tri = trilaterate(obs, lat, lon)
         if (tri != null) {
             return Estimate(tri[0], tri[1], max(tri[2] + 1.0, 2.0).toFloat(), obs.size, persistence, altM, rttFix = true)   // +1 m : écart-type RTT typique
         }
         var sd2 = 0.0; var sacc = 0.0
-        for (o in obs) { val w = weight(o.rssi); val d = distanceM(lat, lon, o.lat, o.lon); sd2 += w * d * d; sacc += w * o.acc }
+        for (o in obs) { val w = weight(o.rssi, o.acc); val d = distanceM(lat, lon, o.lat, o.lon); sd2 += w * d * d; sacc += w * o.acc }
         val rms = sqrt(sd2 / sw); val acc = sacc / sw
         val radius = max(rms + acc, floorRadius(obs.maxOf { it.rssi }, kind).toDouble()).toFloat()
         return Estimate(lat, lon, radius, obs.size, persistence, altM)

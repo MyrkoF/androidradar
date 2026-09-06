@@ -34,6 +34,14 @@ Conséquence : chaque objet sur la carte porte un cercle d'incertitude visible, 
 
 En BLE, la majorité des appareils vus sont des personnes en déplacement. La carte réelle d'un lieu est ce qui **reste**. Chaque appareil porte un statut de persistance, recalculé sur son historique d'observations : `stationnaire` (vu ≥ 3 min depuis ≥ 2 positions du téléphone distantes de ≥ 10 m, position estimée qui converge), `passant` (vu < 2 min puis disparu), `avec moi` (signal stable alors que le téléphone s'est déplacé de > 30 m), `indéterminé` (pas assez de mesures). La carte n'affiche par défaut que le stationnaire (plein) et l'indéterminé (estompé) ; le diff de sessions ne compare que le stationnaire. L'identité d'un appareil est son adresse (BSSID / MAC) ; le SSID est un nom, pas une identité (une box = plusieurs BSSID) ; une adresse BLE aléatoire n'est jamais une référence.
 
+### 3 ter. Stabilisation des positions (décision 2026-09-06, issue #10)
+
+- Une mesure par endroit : une nouvelle observation d'un émetteur n'est enregistrée que si le téléphone a bougé d'au moins 3 m depuis la précédente (sinon on garde la meilleure lecture à cet endroit). Attendre immobile ne fausse pas la carte.
+- Verrou : stationnaire, ≥ 8 observations, rayon < 30 m → position figée (🔒), qui ne bouge plus que lentement sous beaucoup de mesures contraires.
+- Rejet des mesures absurdes : au-delà de 6 observations, celles à plus de 2× le rayon du barycentre sont ignorées.
+- Confiance au bon GPS : le poids d'une observation décroît avec la précision GPS (référence 10 m).
+- Le podomètre arbitre le mouvement du téléphone (§4 ter). Intérieur/extérieur : automatique seulement, pas de bouton.
+
 ## 4. Fonctions v0.2 (périmètre fermé)
 
 Carte
@@ -103,4 +111,5 @@ Le téléphone ne reçoit pas sous le GHz. Pour inventorier le 868/915 MHz, une 
 - Protocole BLE simple, lignes texte horodatées ; le GPS du T-Beam peut remplacer celui du téléphone.
 - Mode logger : posé seul sur un site, il enregistre 24 h+ et se vide en BLE au retour. C'est le seul cas « autonome » retenu.
 - Le même T-Beam sert ensuite de nœud Meshtastic dans le village.
+- Décision 2026-09-06 (#11) : tête = T-Beam **+ module CC1101** (réception sub-GHz large bande 300–928 MHz, comme le Flipper Zero, en réception seulement) ; l'ESP32 voit aussi les stations Wi-Fi (probe requests) et le BLE déporté. RTL-SDR : pas retenue pour l'instant.
 - Prérequis posé dès la v0.2 : une interface `Sensor` unique (Wi-Fi interne, BLE interne, sonde externe) qui alimente le même `observe()`.

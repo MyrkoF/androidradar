@@ -57,6 +57,44 @@ class EstimatorTest {
         assertEquals(Persistence.STATIONARY, Estimator.persistence(0, 0, 0, emptyList(), Kind.CELL))
     }
 
+    @Test fun `stabilisation a une mesure par endroit`() {
+        val last = at(0.0, 0.0, -60)
+        assertTrue(Estimator.samePlace(last, lat0, lon0 + 1.0 / (111_320.0 * Math.cos(Math.toRadians(lat0)))))
+        assertTrue(!Estimator.samePlace(last, lat0, lon0 + 5.0 / (111_320.0 * Math.cos(Math.toRadians(lat0)))))
+        assertTrue(!Estimator.samePlace(null, lat0, lon0))
+    }
+
+    @Test fun `stabilisation d confiance au bon GPS`() {
+        assertTrue(Estimator.weight(-60, 5f) == Estimator.weight(-60, 10f))          // référence 10 m, pas de bonus en dessous
+        assertTrue(Estimator.weight(-60, 40f) < Estimator.weight(-60, 10f) / 10)     // 40 m : 16× moins
+        // deux observations symétriques, l'une avec un GPS précis, l'autre imprécis → le centroïde penche vers la précise
+        val e = Estimator.estimate(listOf(at(0.0, -20.0, -70, acc = 5f), at(0.0, 20.0, -70, acc = 40f)), Kind.WIFI, Persistence.UNKNOWN)
+        assertTrue(e.lon!! < lon0)
+    }
+
+    @Test fun `stabilisation c rejet des aberrantes`() {
+        val good = (0 until 7).map { at(0.0, it * 4.0, -65, t = it * 10_000L) }
+        val withOutlier = good + at(400.0, 0.0, -65, t = 80_000L)
+        val e = Estimator.estimate(withOutlier, Kind.WIFI, Persistence.UNKNOWN)
+        assertTrue("centroïde ${Estimator.distanceM(lat0, lon0, e.lat!!, e.lon!!)} m", Estimator.distanceM(lat0, lon0 + 12.0 / (111_320.0 * Math.cos(Math.toRadians(lat0))), e.lat, e.lon) < 10.0)
+        assertEquals(8, e.n)
+    }
+
+    @Test fun `stabilisation b verrou`() {
+        val obs = (0 until 10).map { at((it % 3) * 6.0, (it / 3) * 6.0, -60, t = it * 30_000L, acc = 5f) }
+        val e1 = Estimator.estimate(obs, Kind.WIFI, Persistence.STATIONARY)
+        assertTrue("verrouillé attendu (rayon ${e1.radius}, n ${e1.n})", e1.locked)
+        // une mesure contraire à 100 m ne déplace le verrou que de 10 % du chemin
+        val far = obs + at(0.0, 100.0, -50, t = 400_000L, acc = 5f)
+        val e2 = Estimator.estimate(far, Kind.WIFI, Persistence.STATIONARY, prev = e1)
+        assertTrue(e2.locked)
+        val moved = Estimator.distanceM(e1.lat!!, e1.lon!!, e2.lat!!, e2.lon!!)
+        assertTrue("déplacement $moved m", moved < 15.0)
+        // sans verrou préalable, la même mesure forte tire nettement plus loin
+        val e3 = Estimator.estimate(far, Kind.WIFI, Persistence.STATIONARY)
+        assertTrue(Estimator.distanceM(e1.lat, e1.lon, e3.lat!!, e3.lon!!) > moved)
+    }
+
     @Test fun `persistance`() {
         val m = 60_000L
         // vu 30 s puis disparu depuis 2 min → passant

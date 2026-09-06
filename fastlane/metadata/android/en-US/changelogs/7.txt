@@ -1,0 +1,5 @@
+- Pedometer arbitrates motion: no more "two streets walked" for ten steps indoors; GPS held (⏸) when it jumps without steps
+- Stabilisation: one observation per place, 🔒 lock when sure, outlier rejection, trust good GPS
+- Radar: zoom pushes the center (at max, the -85…-100 dBm band fills the disc)
+- Monitor at top right (map and radar): approaching/leaving, heading rose, details on ⓘ
+- Map: Follow / Orient / Stationary⇄All / Offline buttons; circle and observation dots for the selected object only

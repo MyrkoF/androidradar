@@ -48,7 +48,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         }
         Text(
             "${d.rssi} dBm · ${d.kind.name} · ${d.category.label}" +
-                (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") } ?: " · pas encore positionné"),
+                (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") + (if (it.locked) " · 🔒 stable" else "") } ?: " · pas encore positionné"),
             color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
         WalkGuide(d, st, compact = !full)

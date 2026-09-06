@@ -1,0 +1,5 @@
+- Le podomètre arbitre le mouvement : plus de « deux rues parcourues » pour dix pas en appartement ; GPS tenu (⏸) quand il saute sans pas
+- Stabilisation des objets : une mesure par endroit, verrou 🔒 quand c'est sûr, rejet des mesures absurdes, confiance au bon GPS
+- Radar : le zoom repousse le centre (au maximum, la bande -85…-100 dBm remplit le disque)
+- Moniteur en haut à droite (carte et radar) : approche/éloigne, rose des caps, fiche sur ⓘ
+- Carte : boutons Suivre / Orienter / Stationnaires⇄Tout / Hors ligne ; cercle et points d'observation de l'objet choisi seulement

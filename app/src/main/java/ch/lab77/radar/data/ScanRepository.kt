@@ -193,11 +193,18 @@ object ScanRepository {
             if (loc != null) synchronized(obsById) {
                 val list = obsById.getOrPut(id) { ArrayDeque() }
                 val fresh = rtt[id]?.first   // distance mesurée récente (RTT toutes les ~12 s)
-                list.addLast(Obs(now, loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 30f, rssi, _status.value.baroAltM, fresh))
-                while (list.size > Estimator.MAX_OBS) list.removeFirst()
+                val acc = if (loc.hasAccuracy()) loc.accuracy else 30f
+                val last = list.lastOrNull()
+                if (Estimator.samePlace(last, loc.latitude, loc.longitude)) {
+                    // (a) même endroit : on garde la meilleure lecture, sans empiler
+                    list[list.lastIndex] = last!!.copy(t = now, rssi = maxOf(last.rssi, rssi), acc = minOf(last.acc, acc), rttM = fresh ?: last.rttM)
+                } else {
+                    list.addLast(Obs(now, loc.latitude, loc.longitude, acc, rssi, _status.value.baroAltM, fresh))
+                    while (list.size > Estimator.MAX_OBS) list.removeFirst()
+                }
             }
             val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
-            val est = Estimator.estimate(obs.toList(), kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs.toList(), kind))
+            val est = Estimator.estimate(obs, kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, kind), _estimates.value[id])
             _estimates.update { it + (id to est) }
             if (est.lat != null && now - (lastEstimateWrite[id] ?: 0L) > 10_000) {
                 lastEstimateWrite[id] = now
