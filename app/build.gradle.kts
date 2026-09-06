@@ -12,14 +12,26 @@ android {
         applicationId = "ch.lab77.radar"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
     }
 
+    signingConfigs {
+        // Clé de release fournie par la CI (secrets GitHub, cf. docs/RELEASE.md). Absente en local : APK non signé.
+        val ksPath = System.getenv("RELEASE_KEYSTORE_PATH")
+        if (ksPath != null) create("release") {
+            storeFile = file(ksPath)
+            storeType = "PKCS12"
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

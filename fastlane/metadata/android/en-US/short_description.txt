@@ -1,0 +1,1 @@
+Passive Wi-Fi + BLE RF survey with GPS, offline, WiGLE/JSON exports

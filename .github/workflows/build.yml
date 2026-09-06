@@ -3,11 +3,15 @@ name: Build APK
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
+
+env:
+  KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
 
 jobs:
   build:
@@ -24,29 +28,45 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Unit tests + build debug APK
+      # Clé de release (secrets du dépôt). Sans elle (fork, PR externe) l'APK sort non signé.
+      - name: Restore release keystore
+        if: env.KS_B64 != ''
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Unit tests + build release APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon testDebugUnitTest assembleDebug
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
 
       - name: Name the APK
         id: apk
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
           SHORT=$(git rev-parse --short HEAD)
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           NAME="radar-v${VERSION}-${SHORT}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "$NAME"
+          cp "$APK" "$NAME"
+          cp "$APK" "radar-v${VERSION}.apk"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          ls -la *.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: radar-debug-apk
+          name: radar-release-apk
           path: ${{ steps.apk.outputs.name }}
 
       # Sur main : publie l'APK en Release "latest" (lien direct, stable, sans compte GitHub).
-      # Le tag latest est recréé à chaque build. Les tags v* (releases manuelles) ne sont pas touchés.
+      # Le tag latest est recréé à chaque build. Les tags v* (releases versionnées) ne sont pas touchés.
       - name: Publish release (latest)
         if: github.ref == 'refs/heads/main'
         env:
@@ -58,3 +78,15 @@ jobs:
             --prerelease \
             --title "Radar v${{ steps.apk.outputs.version }} (${{ steps.apk.outputs.short }})" \
             --notes "Build automatique de main @ ${{ github.sha }}. Télécharger l'APK, autoriser les sources inconnues, sideload."
+
+      # Sur tag vX.Y.Z : release versionnée, celle que suivent F-Droid / IzzyOnDroid.
+      - name: Publish versioned release (tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="fastlane/metadata/android/fr-FR/changelogs/${{ steps.apk.outputs.code }}.txt"
+          [ -f "$NOTES" ] || { echo "Radar v${{ steps.apk.outputs.version }}" > /tmp/notes.txt; NOTES=/tmp/notes.txt; }
+          gh release create "$GITHUB_REF_NAME" "radar-v${{ steps.apk.outputs.version }}.apk" \
+            --title "Radar v${{ steps.apk.outputs.version }}" \
+            --notes-file "$NOTES"

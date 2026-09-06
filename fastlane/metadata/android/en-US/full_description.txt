@@ -1,0 +1,9 @@
+Radar is a field tool that observes what is transmitting in Wi-Fi and Bluetooth Low Energy around you, timestamps and geolocates it (native GPS, no Play Services) and classifies manufacturers: cellular routers, network infrastructure, cameras, fleet telematics, industrial, consumer.
+
+Use cases: site survey before a radio deployment, perimeter watch (audible alert on priority devices), inventory of a place, exploration.
+
+What Radar does not do: no traffic interception, no connection to observed devices, no identification of people, no telemetry, no account.
+
+Exports: WiGLE 1.4 CSV, JSON, text debrief. Local SQLite database. The only network use is downloading map tiles (OpenFreeMap) for offline use.
+
+Source code: https://github.com/MyrkoF/androidradar

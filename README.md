@@ -8,9 +8,8 @@ Aucune interception de trafic. Aucune connexion aux appareils observés. Aucune 
 
 ## Compiler
 
-**Via GitHub Actions (aucun outillage local)**
-1. Créer un dépôt GitHub, y pousser ce dossier.
-2. Onglet *Actions* → workflow *Build APK* → l'APK est dans les artefacts (`radar-debug-apk`).
+**Via GitHub Actions (aucun outillage local)** : chaque push sur `main` construit et publie l'APK
+(voir `docs/RELEASE.md`). Artefact du workflow : `radar-release-apk`.
 
 **Via Android Studio** : ouvrir le dossier, *Build → Build APK(s)*.
 
@@ -18,7 +17,12 @@ Aucune interception de trafic. Aucune connexion aux appareils observés. Aucune 
 
 ## Installer
 
-Sideload `app-debug.apk` (autoriser les sources inconnues). Android 8+ requis.
+- **Dernière build de `main`** : [radar-latest.apk](https://github.com/MyrkoF/androidradar/releases/download/latest/radar-latest.apk)
+- **Versions** : [Releases](https://github.com/MyrkoF/androidradar/releases) (tags `vX.Y.Z`)
+- **F-Droid** : via le dépôt [IzzyOnDroid](https://apps.izzysoft.de/) — demande d'inclusion en cours (#6)
+
+Sideload (autoriser les sources inconnues). Android 8+ requis. Les APK sont signés avec la clé de release
+du projet (empreinte dans `docs/RELEASE.md`) ; une version antérieure à la 0.1.3 doit être désinstallée avant.
 
 Au premier démarrage, accorder : **localisation précise** (exigée par Android pour tout scan
 Wi-Fi/BLE, et utilisée pour géolocaliser les relevés), **appareils à proximité** (Android 12+),

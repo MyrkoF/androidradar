@@ -1,0 +1,5 @@
+- Radar : couleur = type (Wi-Fi/BLE), anneau rouge = prioritaire, anneaux en dBm et distance approximative, zoom (pincer), tap = détail
+- Filtre par catégorie commun Liste + Radar ; légende « ? » ; satellites GPS dans la barre d'état
+- Classifieur de fabricants sans recoupement, table OUI Wireshark à jour, noms de fabricants lisibles
+- Service de scan résilient (reprise après kill), détection de l'optimisation batterie et guide vivo/Xiaomi
+- Première version signée avec la clé de release (désinstaller l'ancienne version avant d'installer)
