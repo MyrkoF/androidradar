@@ -1,0 +1,249 @@
+package ch.lab77.radar.ui
+
+import android.graphics.PointF
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.ScanRepository
+import ch.lab77.radar.data.ScanStatus
+import ch.lab77.radar.map.GeoJson
+import ch.lab77.radar.map.MapConfig
+import ch.lab77.radar.map.NetworkState
+import ch.lab77.radar.map.OfflineRegions
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.sample
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * Carte (cahier §4) : fond MapLibre + OpenFreeMap, position du téléphone, trace GPS de la session,
+ * objets Wi-Fi/BLE à leur position estimée avec cercle d'incertitude, tap = fiche détail.
+ * Par défaut seuls les objets stationnaires (et indéterminés, estompés) sont posés (cahier §3 bis).
+ * Téléchargement d'emprise explicite (cahier §8).
+ */
+@OptIn(FlowPreview::class)
+@Composable
+fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
+    val ctx = LocalContext.current
+    remember { MapConfig.init(ctx); true }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val mapView = remember { MapView(ctx).also { it.onCreate(null) } }
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var styleReady by remember { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    var followMe by rememberSaveable { mutableStateOf(true) }
+    var panel by rememberSaveable { mutableStateOf(false) }
+    var maxZoom by rememberSaveable { mutableStateOf(15) }
+    var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
+    val estimates by ScanRepository.estimates.collectAsStateWithLifecycle()
+    val trace by ScanRepository.trace.collectAsStateWithLifecycle()
+    val progress by OfflineRegions.progress.collectAsStateWithLifecycle()
+    val regions by OfflineRegions.regions.collectAsStateWithLifecycle()
+
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose {
+            map?.cameraPosition?.target?.let { t -> savedCam = doubleArrayOf(t.latitude, t.longitude, map?.cameraPosition?.zoom ?: 15.0) }
+            lifecycleOwner.lifecycle.removeObserver(obs)
+            mapView.onDestroy()
+        }
+    }
+
+    LaunchedEffect(mapView) {
+        OfflineRegions.refresh(ctx)
+        mapView.getMapAsync { m ->
+            map = m
+            m.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) followMe = false
+            }
+            m.addOnMapClickListener { ll ->
+                val pt: PointF = m.projection.toScreenLocation(ll)
+                val hit = m.queryRenderedFeatures(pt, "devices").firstOrNull()
+                selected = hit?.getStringProperty("id")
+                true
+            }
+            m.setStyle(Style.Builder().fromUri(MapConfig.STYLE_URL)) { style ->
+                style.addSource(GeoJsonSource("uncert"))
+                style.addSource(GeoJsonSource("trace"))
+                style.addSource(GeoJsonSource("devices"))
+                style.addSource(GeoJsonSource("me"))
+                style.addLayer(FillLayer("uncert-fill", "uncert").withProperties(
+                    PropertyFactory.fillColor(Expression.toColor(Expression.get("color"))), PropertyFactory.fillOpacity(0.10f)))
+                style.addLayer(LineLayer("uncert-line", "uncert").withProperties(
+                    PropertyFactory.lineColor(Expression.toColor(Expression.get("color"))), PropertyFactory.lineWidth(1f), PropertyFactory.lineOpacity(0.5f)))
+                style.addLayer(LineLayer("trace-line", "trace").withProperties(
+                    PropertyFactory.lineColor("#3DDC97"), PropertyFactory.lineWidth(3f), PropertyFactory.lineOpacity(0.7f)))
+                style.addLayer(CircleLayer("devices", "devices").withProperties(
+                    PropertyFactory.circleColor(Expression.toColor(Expression.get("color"))),
+                    PropertyFactory.circleRadius(Expression.get("r")),
+                    PropertyFactory.circleOpacity(Expression.get("op")),
+                    PropertyFactory.circleStrokeColor(Expression.toColor(Expression.get("stroke"))),
+                    PropertyFactory.circleStrokeWidth(1.5f)))
+                style.addLayer(SymbolLayer("devices-label", "devices").withProperties(
+                    PropertyFactory.textField(Expression.get("label")), PropertyFactory.textFont(MapConfig.FONTS),
+                    PropertyFactory.textSize(11f), PropertyFactory.textOffset(arrayOf(0f, 1.3f)),
+                    PropertyFactory.textColor("#D9E4E8"), PropertyFactory.textHaloColor("#0B1215"), PropertyFactory.textHaloWidth(1.2f),
+                    PropertyFactory.textOptional(true)))
+                style.addLayer(CircleLayer("me", "me").withProperties(
+                    PropertyFactory.circleColor("#5CB8FF"), PropertyFactory.circleRadius(7f),
+                    PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(2f)))
+                val cam = savedCam
+                if (cam != null) m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(cam[0], cam[1]), cam[2]))
+                else if (st.lat != null && st.lon != null) m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
+                styleReady = true
+            }
+        }
+    }
+
+    // Objets + cercles : au plus une mise à jour par seconde, quel que soit le rythme des scans
+    LaunchedEffect(styleReady) {
+        if (!styleReady) return@LaunchedEffect
+        snapshotFlow { Triple(devices, estimates, showAll to selected) }.sample(1000).collect { (devs, ests, flags) ->
+            val style = map?.style ?: return@collect
+            val placed = GeoJson.placed(devs, ests, flags.first, ViewFilter::accepts)
+            style.getSourceAs<GeoJsonSource>("devices")?.setGeoJson(GeoJson.devices(placed, flags.second))
+            style.getSourceAs<GeoJsonSource>("uncert")?.setGeoJson(GeoJson.uncertainty(placed))
+        }
+    }
+    LaunchedEffect(styleReady) {
+        if (!styleReady) return@LaunchedEffect
+        snapshotFlow { trace }.sample(2000).collect { map?.style?.getSourceAs<GeoJsonSource>("trace")?.setGeoJson(GeoJson.trace(it)) }
+    }
+    LaunchedEffect(styleReady, st.lat, st.lon, followMe) {
+        if (!styleReady) return@LaunchedEffect
+        map?.style?.getSourceAs<GeoJsonSource>("me")?.setGeoJson(GeoJson.me(st.lat, st.lon))
+        if (followMe && st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLng(LatLng(st.lat, st.lon)))
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+            Box(Modifier.align(Alignment.TopEnd).padding(4.dp).background(Palette.surface.copy(alpha = 0.85f))) { FilterMenu() }
+        }
+        val placedCount = remember(devices, estimates, showAll) { GeoJson.placed(devices, estimates, showAll, ViewFilter::accepts).size }
+        Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(selected = followMe, onClick = {
+                    followMe = true
+                    if (st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
+                }, label = { Text("⌖ Moi") })
+                FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaire") })
+                FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Zones hors ligne") })
+            }
+            Text(
+                "$placedCount posés · ● Wi-Fi ● BLE · cercle = incertitude · estompé = indéterminé · " +
+                    (if (showAll) "tout affiché" else "passants et MAC aléatoires masqués") + " · ${MapConfig.ATTRIBUTION}",
+                color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+            )
+            if (panel) OfflinePanel(map, maxZoom, { maxZoom = it }, progress, regions)
+            val sel = selected?.let { devices[it] }
+            if (sel != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(sel.name.ifBlank { sel.vendor.ifBlank { sel.id } }, color = Palette.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { selected = null }) { Text("✕") }
+                }
+                val e = estimates[sel.id]
+                if (e != null && e.lat != null) Text(
+                    "Position estimée ${"%.5f".format(e.lat)}, ${"%.5f".format(e.lon)} ±${e.radius.toInt()} m · ${e.n} obs · ${e.persistence.label}",
+                    color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp
+                )
+                DeviceDetail(sel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflinePanel(map: MapLibreMap?, maxZoom: Int, onZoom: (Int) -> Unit, progress: OfflineRegions.Progress?, regions: List<OfflineRegions.Info>) {
+    val ctx = LocalContext.current
+    val bounds = map?.projection?.visibleRegion?.latLngBounds
+    val minZoom = 6
+    val tiles = bounds?.let { OfflineRegions.estimateTiles(it, minZoom, maxZoom) } ?: 0L
+    val tooBig = tiles > 12_000
+    val downloading = progress != null && !progress.complete && progress.error == null
+    Column(Modifier.fillMaxWidth().background(Palette.surface2).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Réseau : ${NetworkState.describe(ctx)} · la vue actuelle devient une zone hors ligne (zoom $minZoom → $maxZoom, ≈ $tiles tuiles)",
+            color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (z in listOf(13, 14, 15, 16)) FilterChip(selected = maxZoom == z, onClick = { onZoom(z) }, label = { Text("z$z") })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(enabled = bounds != null && !downloading && !tooBig, onClick = {
+                val name = "Zone " + SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(Date())
+                OfflineRegions.download(ctx, name, bounds!!, minZoom, maxZoom, ctx.resources.displayMetrics.density)
+            }) { Text("Télécharger la vue") }
+            if (downloading) OutlinedButton(onClick = { OfflineRegions.cancel() }) { Text("Annuler") }
+            if (tooBig) Text("trop grand : zoomer ou baisser z", color = Palette.amber, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        }
+        if (progress != null) Text(
+            when {
+                progress.error != null -> "!! ${progress.name} : ${progress.error}"
+                progress.complete -> "✓ ${progress.name} : ${progress.bytes / 1_000_000} Mo"
+                else -> "${progress.name} : ${progress.done}/${progress.required} ressources · ${progress.bytes / 1_000_000} Mo"
+            },
+            color = if (progress.error != null) Palette.amber else Palette.green, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+        )
+        for (r in regions) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${r.name} · ${r.bytes / 1_000_000} Mo" + (if (!r.complete) " (incomplet)" else ""), color = Palette.text,
+                fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { OfflineRegions.delete(ctx, r.id) }) { Text("Suppr.") }
+        }
+        if (regions.isEmpty()) Text("Aucune zone hors ligne. Sans zone, la carte a besoin du réseau.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+    }
+}

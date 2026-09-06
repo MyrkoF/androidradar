@@ -1,0 +1,6 @@
+- Onglet Carte : fond MapLibre + OpenFreeMap, position, trace GPS, objets à leur position estimée avec cercle d'incertitude, tap = détail
+- Zones hors ligne : téléchargement explicite de la vue courante, liste et suppression
+- Statut stationnaire / passant / avec moi par appareil ; la carte n'affiche que ce qui reste
+- Nouvelle catégorie « Routeur Wi-Fi / box » (ZTE, Huawei, Sagemcom, TP-Link…) ; « cellulaire » réservé aux spécialistes
+- Filtres : un menu ⚙ à cocher (types, catégories, disparus), commun à Liste, Radar et Carte
+- Radar tenu dans l'écran, échelle non linéaire, zoom pincer ; Liste sans boutons obscurs

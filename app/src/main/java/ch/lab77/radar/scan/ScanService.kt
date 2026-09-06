@@ -81,6 +81,7 @@ class ScanService : Service() {
                     bleGapReported = true
                 } else if (gap <= BLE_GAP_MS) bleGapReported = false
             }
+            ScanRepository.refreshPersistence()
             updateNotification()
             handler.postDelayed(this, WATCHDOG_MS)
         }

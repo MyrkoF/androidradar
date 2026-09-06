@@ -1,6 +1,6 @@
 # Radar — relevé RF passif (Wi-Fi + BLE) pour Android
 
-Outil terrain, hors ligne, sans permission Internet. Observe les métadonnées publiquement diffusées
+Outil terrain, hors ligne (le réseau ne sert qu'aux fonds de carte). Observe les métadonnées publiquement diffusées
 (balises Wi-Fi, annonces BLE), les horodate et les géolocalise, classe les fabricants, et exporte
 en CSV WiGLE / JSON / débrief texte pour analyse par un LLM.
 
@@ -39,7 +39,12 @@ l'app affiche `throttle` quand elle est bridée et lit alors le cache système).
 - **Liste** : tri prioritaires puis signal ; filtres ; toucher une ligne pour le détail.
 - **Radar** : le rayon est le signal (RSSI), l'angle est arbitraire mais stable par adresse.
   Un RSSI ne contient pas de direction — l'affichage ne prétend pas le contraire.
-- **Session** : exports (partage système → Drive, Signal, fichier…), journal, nouvelle session.
+- **Carte** : fond OpenFreeMap (MapLibre), position, trace GPS, objets à leur position estimée avec cercle
+  d'incertitude calculé. Par défaut seuls les objets stationnaires sont posés ; les passants et MAC aléatoires
+  sont masqués. « Zones hors ligne » télécharge la vue courante pour l'usage sans réseau — c'est le seul usage
+  du réseau de l'app.
+- **Session** : exports (partage système → Drive, Signal, fichier…), journal, batterie, réseau, nouvelle session.
+- **⚙ Filtres** (en haut à droite) : types, catégories, disparus — communs aux trois vues.
 
 Le CSV suit le format WiGLE 1.4 : importable sur wigle.net et lisible par les outils du même écosystème.
 La base SQLite locale (`radar.db`, schéma inspiré de WiGLE) accumule toutes les sessions.
@@ -51,7 +56,8 @@ le nom long de la table OUI (`assets/oui.tsv`). Un test unitaire (`ClassifierTes
 les doublons et les règles masquées. À enrichir au fil des relevés — c'est volontairement lisible.
 
 Catégories : routeur cellulaire, flotte/télématique, caméra, infra réseau, industriel/IoT pro,
-grand public, MAC aléatoire, inconnu. Prioritaire = les cinq premières.
+routeur Wi-Fi / box, grand public, MAC aléatoire, inconnu. À surveiller (bip) = les cinq premières.
+C'est une déduction par fabricant, jamais une certitude.
 
 ## Limites connues (v0.1)
 
@@ -59,7 +65,6 @@ grand public, MAC aléatoire, inconnu. Prioritaire = les cinq premières.
   l'identifiant d'entreprise Bluetooth SIG quand il est présent dans l'annonce (table partielle).
 - Table OUI : régénérée le 2026-09-06 depuis le fichier `manuf` de Wireshark. Pour la mettre à jour :
   `python3 tools/update_oui.py` (télécharge la version courante et réécrit `assets/oui.tsv`).
-- Pas de carte : les positions sont dans les exports.
 
 ## Licence et attributions
 

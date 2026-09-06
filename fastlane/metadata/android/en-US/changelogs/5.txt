@@ -1,0 +1,6 @@
+- Map tab: MapLibre + OpenFreeMap basemap, position, GPS trace, devices at estimated position with uncertainty circle, tap = detail
+- Offline areas: explicit download of the current view, list and delete
+- Stationary / passing / with-me status per device; the map only shows what stays
+- New category "Wi-Fi router / box" (ZTE, Huawei, Sagemcom, TP-Link…); "cellular" reserved to specialists
+- Filters: a single ⚙ menu with checkboxes (types, categories, gone), shared by List, Radar and Map
+- Radar fits the screen, non-linear scale, pinch zoom; List without obscure buttons

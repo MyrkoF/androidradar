@@ -24,10 +24,8 @@ object Classifier {
         "robustel" to Category.CELLULAR_ROUTER,
         "inhand" to Category.CELLULAR_ROUTER,
         "four-faith" to Category.CELLULAR_ROUTER,
-        "zte" to Category.CELLULAR_ROUTER,
         "quectel" to Category.CELLULAR_ROUTER,
         "telit" to Category.CELLULAR_ROUTER,
-        "u-blox" to Category.CELLULAR_ROUTER,
         "fibocom" to Category.CELLULAR_ROUTER,
         "space exploration technologies" to Category.CELLULAR_ROUTER,   // Starlink
         "jaguar network" to Category.CELLULAR_ROUTER,
@@ -100,15 +98,10 @@ object Classifier {
         "cambium" to Category.NETWORK_INFRA,
         "mikrotik" to Category.NETWORK_INFRA,
         "routerboard" to Category.NETWORK_INFRA,             // OUI MikroTik = Routerboard.com
-        "tp-link" to Category.NETWORK_INFRA,
-        "zyxel" to Category.NETWORK_INFRA,
-        "netgear" to Category.NETWORK_INFRA,
-        "d-link" to Category.NETWORK_INFRA,
         "engenius" to Category.NETWORK_INFRA,
         "edgecore" to Category.NETWORK_INFRA,
         "edge-core" to Category.NETWORK_INFRA,
         "arista" to Category.NETWORK_INFRA,
-        "huawei technologies" to Category.NETWORK_INFRA,     // « huawei device » = téléphones, plus bas
         "huawei symantec" to Category.NETWORK_INFRA,
         "nokia" to Category.NETWORK_INFRA,                   // les téléphones Nokia sont « HMD Global »
         "ericsson" to Category.NETWORK_INFRA,
@@ -123,9 +116,26 @@ object Classifier {
         "palo alto" to Category.NETWORK_INFRA,
         "aerohive" to Category.NETWORK_INFRA,
         "lancom" to Category.NETWORK_INFRA,
-        "draytek" to Category.NETWORK_INFRA,
         "grandstream" to Category.NETWORK_INFRA,
         "aviat" to Category.NETWORK_INFRA,
+
+        // --- Routeurs Wi-Fi / box (priorité 2, non prioritaire) : fabricants de CPE grand public et box opérateur.
+        // ZTE et Huawei font aussi du LTE et du cœur de réseau, mais un AP Wi-Fi de ces marques est presque
+        // toujours une box (Telmex, Orange…) : déduction par fabricant, jamais une certitude. ---
+        "zte" to Category.ROUTER_AP,
+        "huawei technologies" to Category.ROUTER_AP,          // « huawei device » = téléphones, plus bas
+        "sagemcom" to Category.ROUTER_AP,
+        "technicolor" to Category.ROUTER_AP,
+        "arris" to Category.ROUTER_AP,
+        "askey" to Category.ROUTER_AP,
+        "tp-link" to Category.ROUTER_AP,
+        "netgear" to Category.ROUTER_AP,
+        "d-link" to Category.ROUTER_AP,
+        "zyxel" to Category.ROUTER_AP,
+        "draytek" to Category.ROUTER_AP,
+        "eero" to Category.ROUTER_AP,
+        "avm" to Category.ROUTER_AP,                          // Fritz!Box
+        "sercomm" to Category.ROUTER_AP,
 
         // --- Industriel / IoT pro (priorité 3) ---
         "siemens" to Category.INDUSTRIAL,
@@ -167,6 +177,7 @@ object Classifier {
         "itron" to Category.INDUSTRIAL,
         "landis" to Category.INDUSTRIAL,
         "kamstrup" to Category.INDUSTRIAL,
+        "u-blox" to Category.INDUSTRIAL,
         "espressif" to Category.INDUSTRIAL,                  // ESP32/ESP8266 : modules IoT, un seul classement
         "raspberry pi" to Category.INDUSTRIAL,
         "arduino" to Category.INDUSTRIAL,
@@ -229,10 +240,6 @@ object Classifier {
         "meta platforms" to Category.CONSUMER,
         "gopro" to Category.CONSUMER,
         "dji" to Category.CONSUMER,
-        "sagemcom" to Category.CONSUMER,
-        "technicolor" to Category.CONSUMER,
-        "arris" to Category.CONSUMER,
-        "askey" to Category.CONSUMER,
         "azurewave" to Category.CONSUMER,
         "liteon" to Category.CONSUMER,
         "murata" to Category.CONSUMER,

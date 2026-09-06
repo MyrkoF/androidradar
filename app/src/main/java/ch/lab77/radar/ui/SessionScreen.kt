@@ -35,6 +35,7 @@ import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 import ch.lab77.radar.export.Exporter
+import ch.lab77.radar.map.NetworkState
 
 @Composable
 fun SessionScreen(devices: Map<String, Device>, st: ScanStatus) {
@@ -51,6 +52,10 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus) {
             "Session ${durMin} min · Wi-Fi ${all.count { it.kind == Kind.WIFI }} · BLE ${all.count { it.kind == Kind.BLE }} · prioritaires ${all.count { it.category.isPriority }}" +
                 (if (st.lat != null) "\n@ ${"%.5f".format(st.lat)}, ${"%.5f".format(st.lon)}" else "\nGPS : pas de fix"),
             color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp
+        )
+        Text(
+            "Réseau : ${NetworkState.describe(ctx)} — utilisé uniquement pour les fonds de carte (onglet Carte)",
+            color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
         BatteryBanner(st)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

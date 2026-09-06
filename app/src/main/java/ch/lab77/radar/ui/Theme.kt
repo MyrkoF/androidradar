@@ -27,9 +27,10 @@ fun categoryColor(c: Category): Color = when (c) {
     Category.CAMERA -> Palette.amber
     Category.NETWORK_INFRA -> Palette.amber
     Category.INDUSTRIAL -> Palette.violet
+    Category.ROUTER_AP -> Palette.blue
     Category.CONSUMER -> Palette.green
     Category.RANDOMIZED -> Palette.muted
-    Category.UNKNOWN -> Palette.blue
+    Category.UNKNOWN -> Palette.text
 }
 
 fun kindColor(k: Kind): Color = if (k == Kind.WIFI) Palette.green else Palette.blue

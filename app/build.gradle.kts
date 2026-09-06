@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "ch.lab77.radar"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "ch.lab77.radar"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
     }
 
     signingConfigs {
@@ -61,5 +61,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // Carte : MapLibre Native (BSD-2) ; seul le package map/ touche au réseau (cahier §8)
+    implementation("org.maplibre.gl:android-sdk:13.6.0")
+    implementation("org.maplibre.gl:android-sdk-turf:6.0.1")
     testImplementation("junit:junit:4.13.2")
 }

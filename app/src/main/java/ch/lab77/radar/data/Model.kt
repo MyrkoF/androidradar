@@ -9,12 +9,22 @@ enum class Category(val label: String, val priority: Int) {
     CAMERA("Caméra / vidéo", 4),
     INDUSTRIAL("Industriel / IoT pro", 3),
     FLEET("Flotte / télématique", 4),
+    ROUTER_AP("Routeur Wi-Fi / box", 2),
     CONSUMER("Grand public", 1),
     RANDOMIZED("MAC aléatoire", 0),
     UNKNOWN("Inconnu", 0);
 
     val isPriority get() = priority >= 3
 }
+
+/** Statut de persistance (cahier §3 bis) : ce qui reste fait la carte réelle, le reste est du passage. */
+enum class Persistence(val label: String) {
+    UNKNOWN("indéterminé"), STATIONARY("stationnaire"), PASSING("passant"), WITH_ME("avec moi");
+    val onMapByDefault get() = this == STATIONARY || this == UNKNOWN
+}
+
+/** Position estimée d'un émetteur : centroïde pondéré + rayon d'incertitude calculé (cahier §3). lat/lon null = jamais géolocalisé. */
+data class Estimate(val lat: Double?, val lon: Double?, val radius: Float, val n: Int, val persistence: Persistence)
 
 data class Device(
     val kind: Kind,
@@ -75,5 +85,6 @@ data class ScanStatus(
     val satsVisible: Int = 0,       // satellites GNSS vus / utilisés dans le fix
     val satsUsed: Int = 0,
     val sessionStart: Long = 0L,
+    val sessionId: Long = 0L,
     val alertsOn: Boolean = true,
 )

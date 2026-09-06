@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Wifi
@@ -50,6 +51,8 @@ fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
                     icon = { Icon(Icons.Default.Radar, null) }, label = { Text("Radar") })
                 NavigationBarItem(selected = tab == 2, onClick = { tab = 2 },
+                    icon = { Icon(Icons.Default.Map, null) }, label = { Text("Carte") })
+                NavigationBarItem(selected = tab == 3, onClick = { tab = 3 },
                     icon = { Icon(Icons.Default.Share, null) }, label = { Text("Session") })
             }
         }
@@ -58,6 +61,7 @@ fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
             when (tab) {
                 0 -> ListScreen(devices)
                 1 -> RadarScreen(devices)
+                2 -> MapScreen(devices, status)
                 else -> SessionScreen(devices, status)
             }
         }

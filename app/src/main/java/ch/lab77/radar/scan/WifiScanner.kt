@@ -17,11 +17,12 @@ import ch.lab77.radar.data.ScanRepository
  * (levable dans Options développeur > "Limitation du scan Wi-Fi"). Quand startScan() refuse, on relit
  * quand même le cache système : il est rafraîchi par les scans du système lui-même.
  */
-class WifiScanner(private val ctx: Context, private val intervalMs: Long = 8_000L) {
+class WifiScanner(private val ctx: Context, private val intervalMs: Long = 8_000L) : Sensor {
+    override val label = "Wi-Fi"
     private val wifi = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
-    val isRunning: Boolean get() = running
+    override val isRunning: Boolean get() = running
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) { if (running) ingest() }
@@ -38,8 +39,8 @@ class WifiScanner(private val ctx: Context, private val intervalMs: Long = 8_000
         }
     }
 
-    fun start() {
-        if (running) return
+    override fun start(): Boolean {
+        if (running) return true
         running = true
         val f = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         if (Build.VERSION.SDK_INT >= 33) ctx.registerReceiver(receiver, f, Context.RECEIVER_NOT_EXPORTED)
@@ -47,9 +48,10 @@ class WifiScanner(private val ctx: Context, private val intervalMs: Long = 8_000
         handler.post(tick)
         ScanRepository.setStatus { it.copy(wifiOn = true) }
         ScanRepository.logLine("Wi-Fi : scan démarré (intervalle ${intervalMs / 1000}s)")
+        return true
     }
 
-    fun stop() {
+    override fun stop() {
         if (!running) return
         running = false
         handler.removeCallbacks(tick)

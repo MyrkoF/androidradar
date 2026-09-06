@@ -11,11 +11,12 @@ import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
 
 /** Scan BLE continu, indépendant du Wi-Fi. N'utilise que les données d'annonce (pas de connexion). */
-class BleScanner(ctx: Context) {
+class BleScanner(ctx: Context) : Sensor {
+    override val label = "BLE"
     private val manager = ctx.applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private var scanner: BluetoothLeScanner? = null
     private var running = false
-    val isRunning: Boolean get() = running
+    override val isRunning: Boolean get() = running
 
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) = ingest(result)
@@ -28,7 +29,7 @@ class BleScanner(ctx: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun start(): Boolean {
+    override fun start(): Boolean {
         if (running) return true
         val adapter = manager.adapter
         if (adapter == null || !adapter.isEnabled) {
@@ -53,7 +54,7 @@ class BleScanner(ctx: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun stop() {
+    override fun stop() {
         if (!running) return
         running = false
         try { scanner?.stopScan(callback) } catch (_: Exception) {}

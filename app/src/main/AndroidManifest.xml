@@ -25,7 +25,10 @@
     <!-- Demander à sortir de l'optimisation batterie (surcouches vivo/Xiaomi tuent sinon le service) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Aucune permission INTERNET : l'app ne peut physiquement pas parler au réseau -->
+    <!-- Réseau : uniquement pour télécharger les fonds de carte (package map/, cahier §8).
+         Scanners, base et exports n'y touchent jamais ; l'écran Session affiche l'état réseau. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-feature android:name="android.hardware.wifi" android:required="true" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
