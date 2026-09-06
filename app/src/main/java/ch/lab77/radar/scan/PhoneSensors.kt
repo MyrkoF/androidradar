@@ -38,6 +38,9 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     private var accSum = 0.0; private var accMax = 0f; private var accN = 0
     private var headingAcc = -1
     private var lastPressure: Float? = null
+    private var turnEma = 0.0                                   // °/s lissé
+    private var lastPacePush = 0L
+    private val stepTimes = ArrayDeque<Long>()
     private val oneHz = object : Runnable {
         override fun run() {
             if (!running) return
@@ -111,7 +114,18 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
             HwSensor.TYPE_PRESSURE -> onPressure(e.values[0])
             HwSensor.TYPE_STEP_DETECTOR -> onStep()
             HwSensor.TYPE_ACCELEROMETER -> { val m = kotlin.math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]); accSum += m; accN++; if (m > accMax) accMax = m }
-            HwSensor.TYPE_GYROSCOPE -> { val m = kotlin.math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]); gyroSum += m; gyroN++; if (m > gyroMax) gyroMax = m }
+            HwSensor.TYPE_GYROSCOPE -> {
+                val m = kotlin.math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]); gyroSum += m; gyroN++; if (m > gyroMax) gyroMax = m
+                turnEma = turnEma * 0.85 + Math.toDegrees(m.toDouble()) * 0.15
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastPacePush >= 300) {
+                    lastPacePush = now
+                    val t = System.currentTimeMillis()
+                    while (stepTimes.isNotEmpty() && t - stepTimes.first() > 5_000) stepTimes.removeFirst()
+                    val rate = stepTimes.size / 5f
+                    ScanRepository.setStatus { it.copy(turnRateDps = turnEma.toFloat(), stepRate = rate) }
+                }
+            }
         }
     }
 
@@ -160,6 +174,7 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         steps++
         val now = System.currentTimeMillis()
         lastStepAt = now
+        stepTimes.addLast(now)
         ScanRepository.setStatus { it.copy(steps = steps) }
         val st = ScanRepository.status.value
         val heading = st.heading ?: return

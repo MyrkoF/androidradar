@@ -110,6 +110,7 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
                     color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
                 )
                 if (target != null) Text("Objet à pointer : ${target.name.ifBlank { target.vendor.ifBlank { target.id } }} — mettez son boîtier sous le réticule", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                PaceIndicator(st, target?.kind, ar = true)
                 pointed?.let { Text(it, color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
             }
             Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).background(Palette.surface.copy(alpha = 0.85f)).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

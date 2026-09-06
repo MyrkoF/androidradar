@@ -69,6 +69,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         }
         if (aiming) RangeFinderScreen(d, st) { aiming = false }
         if (ar) ArScreen(d) { ar = false }
+        PaceIndicator(st, d.kind)
         WalkGuide(d, st, compact = !full)
         if (full) {
             if (e != null && e.lat != null) Text(

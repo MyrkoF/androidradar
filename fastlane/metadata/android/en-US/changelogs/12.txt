@@ -2,3 +2,4 @@
 - "I am here": long-press the map to anchor your position indoors
 - External probe v0.3: BLE reception (documented protocol), LoRa / sub-GHz objects and Wi-Fi stations
 - Position: a fix without satellites can no longer claim precision
+- Pace light (green / amber / red) in the monitor and camera screen: "turn slower", "walk slower", "scene lost" - beep + vibration when red

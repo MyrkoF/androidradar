@@ -2,3 +2,4 @@
 - « Je suis ici » : appui long sur la carte pour ancrer sa position en intérieur
 - Sonde externe v0.3 : réception BLE (protocole documenté), objets LoRa / sub-GHz et stations Wi-Fi
 - Position : un fix sans satellites ne peut plus se prétendre précis
+- Voyant de rythme (vert / orange / rouge) dans le moniteur et l'écran caméra : « tournez moins vite », « marchez moins vite », « décor perdu » — bip + vibration en rouge

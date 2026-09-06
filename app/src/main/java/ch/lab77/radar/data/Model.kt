@@ -109,6 +109,8 @@ data class ScanStatus(
     val stepsKnown: Boolean = false,      // capteur de pas disponible et autorisé
     val steps: Int = 0,
     val sensors: String = "",       // disponibilité des capteurs, pour l'écran Session
+    val turnRateDps: Float = 0f,    // vitesse de rotation lissée (gyroscope), °/s — voyant de rythme
+    val stepRate: Float = 0f,       // cadence, pas/s (5 dernières secondes)
     val probe: String = "",         // sonde externe : "" / "recherche" / "connectée Radar-TBeam-01 · 87 %"
     val arTracking: String = "",    // suivi caméra ARCore : "" / "initialisation" / "suivi" / "perdu" / "indisponible"
     val sessionStart: Long = 0L,
