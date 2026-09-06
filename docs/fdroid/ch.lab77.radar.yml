@@ -1,0 +1,28 @@
+Categories:
+  - Connectivity
+  - Science & Education
+License: MIT
+AuthorName: Myrko Federico
+AuthorWebSite: https://lab77.ch
+WebSite: https://github.com/MyrkoF/androidradar
+SourceCode: https://github.com/MyrkoF/androidradar
+IssueTracker: https://github.com/MyrkoF/androidradar/issues
+Changelog: https://github.com/MyrkoF/androidradar/releases
+
+AutoName: Radar
+
+RepoType: git
+Repo: https://github.com/MyrkoF/androidradar
+
+Builds:
+  - versionName: 0.1.3
+    versionCode: 4
+    commit: v0.1.3
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.3
+CurrentVersionCode: 4
