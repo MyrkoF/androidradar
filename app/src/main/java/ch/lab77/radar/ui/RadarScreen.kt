@@ -73,7 +73,7 @@ fun RadarScreen(devices: Map<String, Device>) {
                 .pointerInput(visible, span) {
                     detectTapGestures { pos ->
                         val c = Offset(size.width / 2f, size.height / 2f)
-                        val r = size.minDimension / 2f - 8.dp.toPx()
+                        val r = minOf(size.width, size.height) / 2f - 8.dp.toPx()
                         val hit = visible.minByOrNull { (pointFor(it, c, r, span) - pos).getDistance() }
                         selected = if (hit != null && (pointFor(hit, c, r, span) - pos).getDistance() < 28.dp.toPx()) hit.id else null
                     }

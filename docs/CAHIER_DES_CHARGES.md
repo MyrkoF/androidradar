@@ -30,6 +30,10 @@ Un téléphone seul mesure un RSSI, pas une distance. La position d'un émetteur
 
 Conséquence : chaque objet sur la carte porte un cercle d'incertitude visible, calculé, pas décoratif. « Assez précis » se gagne en marchant, pas en calculant. L'app doit guider ce mouvement (mode marche).
 
+## 3 bis. Stationnaire ou passant : filtrer le bruit par le temps et le mouvement (décision 2026-09-06)
+
+En BLE, la majorité des appareils vus sont des personnes en déplacement. La carte réelle d'un lieu est ce qui **reste**. Chaque appareil porte un statut de persistance, recalculé sur son historique d'observations : `stationnaire` (vu ≥ 3 min depuis ≥ 2 positions du téléphone distantes de ≥ 10 m, position estimée qui converge), `passant` (vu < 2 min puis disparu), `avec moi` (signal stable alors que le téléphone s'est déplacé de > 30 m), `indéterminé` (pas assez de mesures). La carte n'affiche par défaut que le stationnaire (plein) et l'indéterminé (estompé) ; le diff de sessions ne compare que le stationnaire. L'identité d'un appareil est son adresse (BSSID / MAC) ; le SSID est un nom, pas une identité (une box = plusieurs BSSID) ; une adresse BLE aléatoire n'est jamais une référence.
+
 ## 4. Fonctions v0.2 (périmètre fermé)
 
 Carte
