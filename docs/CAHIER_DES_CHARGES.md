@@ -54,6 +54,14 @@ Exports
 Fiabilité (préalable, non négociable)
 - Premier build CI vert, test réel sur au moins un téléphone, correction du classifieur (règles sans recoupement, une source de vérité par fabricant), mise à jour de la table OUI.
 
+### 4 bis. Ergonomie — décisions du premier retour terrain (2026-09-06, issue #5)
+
+- Radar : couleur = type (Wi-Fi vert, BLE bleu), anneau rouge = prioritaire ; anneaux étiquetés en dBm et distance approximative (ordre de grandeur, modèle de perte en espace libre) ; zoom de l'échelle de signal (pincer, boutons) ; tap sur un point = fiche détail.
+- Filtre par catégorie (cocher/décocher), commun à la Liste et au Radar.
+- Liste : « vu N× » explicite ; légende dépliable « ? » (pastille = catégorie, chiffre = signal, filtres) ; filtre « Actifs » renommé « < 1 min ».
+- Barre d'état : satellites GNSS utilisés / vus à côté de la précision GPS.
+- Fabricant : nom d'affichage dérivé du nom long de la table OUI (le nom court Wireshark est tronqué à 12 caractères).
+
 ## 5. Appareils cibles
 
 Android 8+ (minSdk 26), plusieurs modèles possibles, aucun figé. Tout doit fonctionner sans Play Services (GPS natif, carte MapLibre). Bancs de test : vivo X Fold 5 (OriginOS) en premier, puis Xiaomi Redmi 14 (HyperOS). Les deux surcouches tuent agressivement les services en arrière-plan : l'app doit détecter l'optimisation batterie active et guider vers son désactivation (écran Session), et le service de scan doit se relancer seul s'il est tué.

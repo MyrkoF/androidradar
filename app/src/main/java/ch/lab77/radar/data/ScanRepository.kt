@@ -72,7 +72,7 @@ object ScanRepository {
             if (prev != null) { vendor = prev.vendor; vendorLong = prev.vendorLong } else {
                 val v = Oui.lookup(id)
                 val company = bleCompanyId?.let { Oui.bleCompany(it) }
-                vendor = v?.short ?: company ?: ""
+                vendor = v?.let { Oui.displayName(it.long, it.short) } ?: company ?: ""
                 vendorLong = v?.long ?: company ?: ""
             }
             val category = prev?.category ?: Classifier.classify(vendorLong, kind, id)

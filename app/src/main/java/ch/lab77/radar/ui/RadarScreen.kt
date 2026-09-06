@@ -7,83 +7,157 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ch.lab77.radar.data.Category
 import ch.lab77.radar.data.Device
 import kotlin.math.cos
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * Radar RSSI. Honnêteté d'affichage : le rayon est la seule mesure (signal → distance estimée),
- * l'angle est un hash stable de l'adresse — il n'y a pas de direction dans un RSSI.
+ * Radar RSSI. Honnêteté d'affichage : le rayon est la seule mesure (signal → distance estimée, ordre de
+ * grandeur), l'angle est un hash stable de l'adresse — il n'y a pas de direction dans un RSSI.
+ * Couleur = type (Wi-Fi / BLE) ; anneau rouge = catégorie prioritaire. Pincer ou boutons pour zoomer
+ * l'échelle de signal ; tap sur un point → fiche détail.
  */
+private const val CENTER_DBM = -30f
+private const val SPAN_MIN = 20f
+private const val SPAN_MAX = 70f
+
 @Composable
 fun RadarScreen(devices: Map<String, Device>) {
     val transition = rememberInfiniteTransition(label = "sweep")
     val sweep by transition.animateFloat(
         0f, 360f, infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "angle"
     )
-    val active = devices.values.filter { it.ageMs < 120_000 }
+    var span by rememberSaveable { mutableFloatStateOf(SPAN_MAX) }   // dBm entre le centre et le bord
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val outer = (CENTER_DBM - span).toInt()
+    val active = devices.values.filter { it.ageMs < 120_000 && ViewFilter.accepts(it) }
+    val visible = active.filter { it.rssi >= outer }
 
-    Column(Modifier.fillMaxWidth().padding(12.dp)) {
-        Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp)) {
+        CategoryChips()
+        Canvas(
+            Modifier.fillMaxWidth().aspectRatio(1f)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, _, zoom, _ -> span = (span / zoom).coerceIn(SPAN_MIN, SPAN_MAX) }
+                }
+                .pointerInput(visible, span) {
+                    detectTapGestures { pos ->
+                        val c = Offset(size.width / 2f, size.height / 2f)
+                        val r = size.minDimension / 2f - 8.dp.toPx()
+                        val hit = visible.minByOrNull { (pointFor(it, c, r, span) - pos).getDistance() }
+                        selected = if (hit != null && (pointFor(hit, c, r, span) - pos).getDistance() < 28.dp.toPx()) hit.id else null
+                    }
+                }
+        ) {
             val c = Offset(size.width / 2, size.height / 2)
             val r = size.minDimension / 2 - 8.dp.toPx()
-            for (k in 1..4) drawCircle(Palette.grid, r * k / 4, c, style = Stroke(1.dp.toPx()))
+            val paint = android.graphics.Paint().apply {
+                color = android.graphics.Color.argb(200, 217, 228, 232)
+                textSize = 10.sp.toPx()
+                typeface = android.graphics.Typeface.MONOSPACE
+            }
+            val ringPaint = android.graphics.Paint(paint).apply { color = android.graphics.Color.argb(170, 124, 143, 151) }
+            for (k in 1..4) {
+                val rk = r * k / 4
+                drawCircle(Palette.grid, rk, c, style = Stroke(1.dp.toPx()))
+                val dbm = (CENTER_DBM - span * k / 4).toInt()
+                drawContext.canvas.nativeCanvas.drawText("$dbm dBm ≈${approxDistance(dbm)}", c.x + 4f, c.y - rk - 3f, ringPaint)
+            }
             drawLine(Palette.grid, Offset(c.x - r, c.y), Offset(c.x + r, c.y), 1.dp.toPx())
             drawLine(Palette.grid, Offset(c.x, c.y - r), Offset(c.x, c.y + r), 1.dp.toPx())
 
             val rad = Math.toRadians(sweep.toDouble())
             drawLine(Palette.green.copy(alpha = 0.6f), c, Offset(c.x + r * cos(rad).toFloat(), c.y + r * sin(rad).toFloat()), 2.dp.toPx())
 
-            val paint = android.graphics.Paint().apply {
-                color = android.graphics.Color.argb(200, 217, 228, 232)
-                textSize = 10.sp.toPx()
-                typeface = android.graphics.Typeface.MONOSPACE
-            }
-            for (d in active) {
-                val dist = ((-d.rssi - 30).coerceIn(0, 70) / 70f) * r
-                val ang = Math.toRadians(angleFor(d.id).toDouble())
-                val p = Offset(c.x + dist * cos(ang).toFloat(), c.y + dist * sin(ang).toFloat())
-                val col = categoryColor(d.category)
+            for (d in visible) {
+                val p = pointFor(d, c, r, span)
+                val col = kindColor(d.kind)
                 val alpha = if (d.ageMs < 30_000) 1f else 0.45f
-                val dotR = if (d.category.isPriority) 7.dp.toPx() else 4.dp.toPx()
+                val dotR = if (d.category.isPriority) 6.dp.toPx() else 4.dp.toPx()
+                if (d.id == selected) drawCircle(Palette.text, dotR + 5.dp.toPx(), p, style = Stroke(2.dp.toPx()))
                 drawCircle(col.copy(alpha = alpha), dotR, p)
-                if (d.category.isPriority) drawCircle(col.copy(alpha = alpha * 0.5f), dotR * 2, p, style = Stroke(1.dp.toPx()))
-                if (d.category.isPriority || d.rssi > -60) {
+                if (d.category.isPriority) drawCircle(Palette.red.copy(alpha = alpha), dotR + 3.dp.toPx(), p, style = Stroke(2.dp.toPx()))
+                if (d.category.isPriority || d.rssi > -60 || d.id == selected) {
                     val label = d.name.ifBlank { d.vendor.ifBlank { d.id.takeLast(8) } }.take(14)
                     drawContext.canvas.nativeCanvas.drawText(label, p.x + dotR + 4f, p.y + 4f, paint)
                 }
             }
             drawCircle(Palette.green, 3.dp.toPx(), c)
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Legend("-30", Palette.text); Legend("-47", Palette.text); Legend("-65", Palette.text); Legend("-82", Palette.text); Legend("-100 dBm", Palette.text)
+
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { span = (span + 10f).coerceAtMost(SPAN_MAX) }, enabled = span < SPAN_MAX) { Text("Zoom −") }
+            OutlinedButton(onClick = { span = (span - 10f).coerceAtLeast(SPAN_MIN) }, enabled = span > SPAN_MIN) { Text("Zoom +") }
+            Text("bord $outer dBm · ${visible.size}/${active.size} actifs", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Legend("● cellulaire/flotte", Palette.red); Legend("● infra/caméra", Palette.amber)
-            Legend("● industriel", Palette.violet); Legend("● public", Palette.green); Legend("● inconnu", Palette.blue)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Legend("● Wi-Fi", Palette.green); Legend("● BLE", Palette.blue); Legend("◎ prioritaire", Palette.red); Legend("estompé = vu > 30 s", Palette.muted)
         }
         Text(
-            "${active.size} actifs · rayon = signal, angle = arbitraire (stable par adresse)",
-            color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp)
+            "rayon = signal (distance ≈ ordre de grandeur) · angle = arbitraire, stable par adresse · pincer pour zoomer · tap = détail",
+            color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 6.dp)
         )
+
+        val sel = selected?.let { devices[it] }
+        if (sel != null) {
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp).background(Palette.surface).padding(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        sel.name.ifBlank { if (sel.kind == ch.lab77.radar.data.Kind.WIFI) "<SSID caché>" else "<sans nom>" },
+                        color = Palette.text, fontSize = 15.sp, modifier = Modifier.weight(1f)
+                    )
+                    OutlinedButton(onClick = { selected = null }) { Text("✕") }
+                }
+                DeviceDetail(sel)
+            }
+        }
+    }
+}
+
+private fun pointFor(d: Device, c: Offset, r: Float, span: Float): Offset {
+    val dist = ((-d.rssi - CENTER_DBM).coerceIn(0f, span) / span) * r
+    val ang = Math.toRadians(angleFor(d.id).toDouble())
+    return Offset(c.x + dist * cos(ang).toFloat(), c.y + dist * sin(ang).toFloat())
+}
+
+/** Distance d'après un modèle de perte en espace libre (Wi-Fi 2,4 GHz, exposant 2,7). Ordre de grandeur seulement. */
+private fun approxDistance(dbm: Int): String {
+    val m = 10.0.pow((-40.0 - dbm) / 27.0)
+    return when {
+        m < 1 -> "<1 m"
+        m < 10 -> "${m.toInt()} m"
+        m < 100 -> "${(m / 5).toInt() * 5} m"
+        else -> "${(m / 50).toInt() * 50} m"
     }
 }
 

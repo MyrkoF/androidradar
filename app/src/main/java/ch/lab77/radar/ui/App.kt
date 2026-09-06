@@ -70,8 +70,9 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("RADAR", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             Text("$count", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
+            val sats = if (st.satsVisible > 0) " ${st.satsUsed}/${st.satsVisible}sat" else ""
             Text(
-                if (st.gpsFix) "GPS ±${st.accuracy?.toInt() ?: 0}m" else "GPS —",
+                (if (st.gpsFix) "GPS ±${st.accuracy?.toInt() ?: 0}m" else "GPS —") + sats,
                 color = if (st.gpsFix) Palette.green else Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace
             )
             if (st.wifiOn && st.wifiThrottled)

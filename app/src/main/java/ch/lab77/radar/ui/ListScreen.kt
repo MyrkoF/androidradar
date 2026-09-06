@@ -31,14 +31,15 @@ import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Kind
 
-private enum class Filter(val label: String) { ALL("Tous"), WIFI("Wi-Fi"), BLE("BLE"), PRIORITY("Prioritaires"), ACTIVE("Actifs") }
+private enum class Filter(val label: String) { ALL("Tous"), WIFI("Wi-Fi"), BLE("BLE"), PRIORITY("Prioritaires"), ACTIVE("< 1 min") }
 
 @Composable
 fun ListScreen(devices: Map<String, Device>) {
     var filter by rememberSaveable { mutableStateOf(Filter.ALL) }
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
+    var help by rememberSaveable { mutableStateOf(false) }
 
-    val list = devices.values.asSequence().filter {
+    val list = devices.values.asSequence().filter(ViewFilter::accepts).filter {
         when (filter) {
             Filter.ALL -> true
             Filter.WIFI -> it.kind == Kind.WIFI
@@ -56,6 +57,23 @@ fun ListScreen(devices: Map<String, Device>) {
             Filter.entries.forEach { f ->
                 FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.label) })
             }
+            FilterChip(selected = help, onClick = { help = !help }, label = { Text("?") })
+        }
+        CategoryChips()
+        if (help) Column(Modifier.fillMaxWidth().background(Palette.surface).padding(10.dp)) {
+            Text("Légende", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendDot(Palette.red, "cellulaire/flotte"); LegendDot(Palette.amber, "infra/caméra"); LegendDot(Palette.violet, "industriel")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendDot(Palette.green, "grand public"); LegendDot(Palette.blue, "inconnu"); LegendDot(Palette.muted, "MAC aléatoire")
+            }
+            Mono("Pastille = catégorie (déduite du fabricant)")
+            Mono("Chiffre = signal dBm : rouge ≥ -55 (très proche), ambre ≥ -70, vert ≥ -85, gris au-delà")
+            Mono("« vu 25× » = nombre d'observations dans la session · ligne grisée = plus vu depuis 1 min")
+            Mono("Prioritaires = catégories à surveiller (cellulaire, infra, caméra, flotte, industriel)")
+            Mono("< 1 min = vus dans la dernière minute · toucher une ligne = détail")
+            Mono("2e ligne = catégories affichées (décocher pour masquer, vaut aussi pour le Radar)")
         }
         LazyColumn {
             items(list, key = { it.id }) { d ->
@@ -84,20 +102,33 @@ private fun DeviceRow(d: Device, open: Boolean, onClick: () -> Unit) {
                     color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 1
                 )
             }
-            Text("${d.seenCount}×", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("vu ${d.seenCount}×", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
-        if (open) {
-            Column(Modifier.padding(start = 20.dp, top = 6.dp)) {
-                Mono("MAC   ${d.id}")
-                Mono("Fab.  ${d.vendorLong.ifBlank { "inconnu" }}")
-                Mono("Cat.  ${d.category.label}")
-                Mono("RSSI  ${d.rssi} dBm (meilleur ${d.bestRssi})")
-                if (d.frequency > 0) Mono("Freq  ${d.frequency} MHz")
-                if (d.capabilities.isNotBlank()) Mono("Caps  ${d.capabilities}")
-                if (d.lat != null) Mono("Pos   ${"%.5f".format(d.lat)}, ${"%.5f".format(d.lon)} ±${d.accuracy?.toInt() ?: 0}m")
-                Mono("Vu    ${d.seenCount}× · il y a ${d.ageMs / 1000}s")
-            }
-        }
+        if (open) Column(Modifier.padding(start = 20.dp, top = 6.dp)) { DeviceDetail(d) }
+    }
+}
+
+/** Fiche détail d'un appareil — partagée entre la Liste (ligne dépliée) et le Radar (tap sur un point). */
+@Composable
+fun DeviceDetail(d: Device) {
+    Column {
+        Mono("MAC   ${d.id}")
+        Mono("Type  ${d.kind.name} · ${d.band}" + (if (d.kind == Kind.WIFI) " · ch${d.channel} · ${d.security}" else ""))
+        Mono("Fab.  ${d.vendorLong.ifBlank { "inconnu" }}")
+        Mono("Cat.  ${d.category.label}" + (if (d.category.isPriority) " (prioritaire)" else ""))
+        Mono("RSSI  ${d.rssi} dBm (meilleur ${d.bestRssi})")
+        if (d.frequency > 0) Mono("Freq  ${d.frequency} MHz")
+        if (d.capabilities.isNotBlank()) Mono("Caps  ${d.capabilities}")
+        if (d.lat != null) Mono("Pos   ${"%.5f".format(d.lat)}, ${"%.5f".format(d.lon)} ±${d.accuracy?.toInt() ?: 0}m")
+        Mono("Vu    ${d.seenCount}× · il y a ${d.ageMs / 1000}s")
+    }
+}
+
+@Composable
+private fun LegendDot(c: androidx.compose.ui.graphics.Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.size(8.dp).background(c, CircleShape))
+        Text(label, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     }
 }
 

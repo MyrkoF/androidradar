@@ -72,6 +72,8 @@ data class ScanStatus(
     val lon: Double? = null,
     val altitude: Double? = null,
     val accuracy: Float? = null,
+    val satsVisible: Int = 0,       // satellites GNSS vus / utilisés dans le fix
+    val satsUsed: Int = 0,
     val sessionStart: Long = 0L,
     val alertsOn: Boolean = true,
 )
