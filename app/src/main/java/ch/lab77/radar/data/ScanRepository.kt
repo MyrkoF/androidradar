@@ -146,11 +146,16 @@ object ScanRepository {
     fun setLocation(loc: Location, estimated: Boolean = false) {
         val now = System.currentTimeMillis()
         val st = _status.value
-        val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 50f, now, estimated)
+        // Un fix « réseau » (Wi-Fi / antennes) ou sans géométrie satellite (< 4 satellites utilisés) ne peut pas
+        // se prétendre précis : en intérieur il annonce ±15 m et se trompe de 50 m. On le plafonne à ±40 m,
+        // donc il ne remplace jamais les pas + le cap (retour terrain n°5).
+        val rawAcc = if (loc.hasAccuracy()) loc.accuracy else 50f
+        val trusted = estimated || (loc.provider == "gps" && st.satsUsed >= 4)
+        val next = PositionFilter.Fix(loc.latitude, loc.longitude, if (trusted) rawAcc else maxOf(rawAcc, 40f), now, estimated)
         val stepsSince = st.steps - stepsAtAccepted
         val ok = estimated || PositionFilter.accept(acceptedFix, next, stepsSince, st.stepsKnown)
         if (!estimated) lastRealFixAt = now
-        recordPos(PosEvent(now, if (estimated) "estime" else loc.provider ?: "gps", loc.latitude, loc.longitude, next.acc, ok, stepsSince, st.heading,
+        recordPos(PosEvent(now, if (estimated) "estime" else (loc.provider ?: "gps") + (if (trusted) "" else " (non fiable, ${st.satsUsed} sat)"), loc.latitude, loc.longitude, next.acc, ok, stepsSince, st.heading,
             when { estimated -> "pas + cap"; ok -> "accepté"; else -> "rejeté : ${acceptedFix?.let { "saut de ${Estimator.distanceM(it.lat, it.lon, loc.latitude, loc.longitude).toInt()} m pour $stepsSince pas (tenu ±${it.acc.toInt()} m${if (it.estimated) ", estime" else ""})" } ?: "?"}" }))
         if (ok) {
             acceptedFix = next; stepsAtAccepted = st.steps
