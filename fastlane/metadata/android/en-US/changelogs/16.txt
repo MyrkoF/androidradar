@@ -1,0 +1,1 @@
+- Camera thumbnail (small live-view rectangle) on the map and radar; tap = aim at the selected object

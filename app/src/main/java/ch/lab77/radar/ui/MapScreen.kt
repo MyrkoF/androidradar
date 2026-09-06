@@ -85,6 +85,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     var headUp by rememberSaveable { mutableStateOf(false) }
     var manual by remember { mutableStateOf<LatLng?>(null) }
     var arOpen by rememberSaveable { mutableStateOf(false) }
+    var thumb by rememberSaveable { mutableStateOf(false) }
+    var aimOpen by rememberSaveable { mutableStateOf(false) }
     var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     val estimates by ScanRepository.estimates.collectAsStateWithLifecycle()
     val trace by ScanRepository.trace.collectAsStateWithLifecycle()
@@ -195,6 +197,11 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+            if (thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) {
+                CameraThumb { if (selected != null) aimOpen = true else arOpen = true }
+            }
+            val aimDev = selected?.let { devices[it] }
+            if (aimOpen && aimDev != null) RangeFinderScreen(aimDev, st) { aimOpen = false }
             Column(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalAlignment = Alignment.End) {
                 Box(Modifier.background(Palette.surface.copy(alpha = 0.85f))) { FilterMenu() }
                 val sel = selected?.let { devices[it] }
@@ -213,6 +220,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaires") })
                 FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Hors ligne") })
                 FilterChip(selected = arOpen, onClick = { arOpen = true }, label = { Text("📷 Caméra") })
+                FilterChip(selected = thumb, onClick = { thumb = !thumb }, label = { Text("Vignette") })
             }
             if (arOpen) ArScreen(selected?.let { devices[it] }) { arOpen = false }
             manual?.let { ll ->

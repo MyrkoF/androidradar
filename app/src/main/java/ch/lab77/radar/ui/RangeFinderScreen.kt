@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +63,7 @@ fun RangeFinderScreen(d: Device, st: ScanStatus, onClose: () -> Unit) {
     val dist = pitch?.let { RangeFinder.distanceM(eyeM, it) }
     var saved by remember { mutableStateOf<Float?>(null) }
 
+    DisposableEffect(Unit) { CameraUse.busy = true; onDispose { CameraUse.busy = false } }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Palette.bg)) {
             if (camGranted) AndroidView(

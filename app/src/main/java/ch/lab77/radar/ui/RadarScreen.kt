@@ -64,6 +64,8 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
     )
     var center by rememberSaveable { mutableFloatStateOf(CENTER_MAX) }   // dBm au centre ; le bord est fixe à -100
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var thumb by rememberSaveable { mutableStateOf(false) }
+    var aimOpen by rememberSaveable { mutableStateOf(false) }
     val span = center - EDGE_DBM
     val active = devices.values.filter { it.ageMs < 120_000 && ViewFilter.accepts(it) }
     val visible = active.filter { it.rssi <= center.toInt() + 3 }   // les plus forts que le centre sortent du disque
@@ -73,11 +75,14 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
             OutlinedButton(onClick = { center = (center + 10f).coerceAtMost(CENTER_MAX) }, enabled = center < CENTER_MAX) { Text("−") }
             OutlinedButton(onClick = { center = (center - 10f).coerceAtLeast(CENTER_MIN) }, enabled = center > CENTER_MIN) { Text("+") }
             Text("fenêtre ${center.toInt()}…${EDGE_DBM.toInt()} dBm · ${visible.size}/${active.size}", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { thumb = !thumb }) { Text("📷") }
             FilterMenu()
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             val sel = selected?.let { devices[it] }
             if (sel != null) Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { Monitor(sel, null, st) { selected = null } }
+            if (thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { CameraThumb { if (sel != null) aimOpen = true } }
+            if (aimOpen && sel != null) RangeFinderScreen(sel, st) { aimOpen = false }
             Canvas(
                 Modifier.fillMaxSize()
                     .pointerInput(Unit) {

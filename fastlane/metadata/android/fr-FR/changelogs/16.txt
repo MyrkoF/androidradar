@@ -1,0 +1,1 @@
+- Vignette caméra (petit rectangle avec la vue en direct) sur la carte et le radar ; toucher = viser l'objet sélectionné

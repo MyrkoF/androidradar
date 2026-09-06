@@ -79,6 +79,7 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { tracker.pause(); tracker.close() } }
 
+    DisposableEffect(Unit) { CameraUse.busy = true; onDispose { CameraUse.busy = false } }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Palette.bg)) {
             if (ready) AndroidView(
