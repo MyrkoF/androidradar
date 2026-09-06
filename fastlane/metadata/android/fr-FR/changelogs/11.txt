@@ -1,0 +1,5 @@
+- Écran Session défilant, en sections (les boutons d'export étaient passés sous le bord de l'écran)
+- Sessions : liste, reprendre (l'affinage continue avec les observations enregistrées), renommer, supprimer, comparer deux visites (nouveaux / disparus / déplacés / modifiés) et exporter le diff
+- Liste blanche : « Connu » dans le moniteur, « Tout marquer connu » — plus de bip pour ce qui est connu du lieu
+- Télémètre par visée : « ◎ Viser » dans le moniteur, aperçu caméra avec réticule, hauteur des yeux réglable, la distance enregistrée affine la position
+- APK arm64 seul (~25 Mo)

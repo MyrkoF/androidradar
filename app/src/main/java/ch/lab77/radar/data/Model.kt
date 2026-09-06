@@ -98,6 +98,7 @@ data class ScanStatus(
     val satsUsed: Int = 0,
     val cellOn: Boolean = false,
     val heading: Float? = null,     // cap vrai en degrés (boussole), null si pas de capteur
+    val pitch: Float? = null,       // élévation de l'axe de la caméra en degrés (négatif = vers le bas), télémètre par visée
     val pressureHpa: Float? = null,
     val baroAltM: Float? = null,    // altitude barométrique relative au départ de session
     val deadReckoning: Boolean = false,   // position actuelle = estime (pas + cap), pas un fix GPS
@@ -109,3 +110,16 @@ data class ScanStatus(
     val sessionId: Long = 0L,
     val alertsOn: Boolean = true,
 )
+
+/** Une session en base (un lieu + une date). */
+data class SessionInfo(val id: Long, val name: String, val start: Long, val end: Long?, val positioned: Int)
+
+/** Estimation persistée d'une session, avec ce qu'il faut pour un diff lisible. */
+data class EstRow(
+    val id: String, val lat: Double, val lon: Double, val radius: Float, val n: Int, val persistence: Persistence,
+    val name: String, val security: String, val kind: Kind, val category: Category, val confirmed: Boolean,
+)
+
+enum class DiffKind(val label: String) { NEW("nouveau"), GONE("disparu"), MOVED("déplacé"), CHANGED("modifié") }
+
+data class DiffEntry(val kind: DiffKind, val id: String, val name: String, val category: Category, val detail: String)

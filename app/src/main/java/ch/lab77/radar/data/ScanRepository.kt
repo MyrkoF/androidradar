@@ -31,6 +31,14 @@ object ScanRepository {
     private val _status = MutableStateFlow(ScanStatus())
     val status: StateFlow<ScanStatus> = _status.asStateFlow()
 
+    /** Connus du lieu (liste blanche) : pas d'alerte sonore, marqués dans les fiches. */
+    private val _whitelist = MutableStateFlow<Set<String>>(emptySet())
+    val whitelist: StateFlow<Set<String>> = _whitelist.asStateFlow()
+
+    /** Sessions en base, rafraîchies à la demande. */
+    private val _sessions = MutableStateFlow<List<SessionInfo>>(emptyList())
+    val sessions: StateFlow<List<SessionInfo>> = _sessions.asStateFlow()
+
     private val _log = MutableSharedFlow<String>(replay = 50, extraBufferCapacity = 200)
     val log = _log.asSharedFlow()
 
@@ -58,9 +66,59 @@ object ScanRepository {
     private val sessionNameFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT)
 
     fun init(ctx: Context) {
-        if (db == null) db = Db(ctx.applicationContext)
+        if (db == null) {
+            db = Db(ctx.applicationContext)
+            io.execute { try { _whitelist.value = db?.whitelist() ?: emptySet(); refreshSessions() } catch (_: Exception) {} }
+        }
         Oui.load(ctx)
         if (_status.value.sessionStart == 0L) openSession()
+    }
+
+    fun refreshSessions() { io.execute { try { _sessions.value = db?.sessions() ?: emptyList() } catch (_: Exception) {} } }
+    fun renameSession(id: Long, name: String) { io.execute { try { db?.renameSession(id, name) } catch (_: Exception) {}; refreshSessions() } }
+    fun deleteSession(id: Long) { io.execute { try { db?.deleteSession(id) } catch (_: Exception) {}; refreshSessions() } }
+    fun sessionEstimates(id: Long): Map<String, EstRow> = try { db?.sessionEstimates(id) ?: emptyMap() } catch (_: Exception) { emptyMap() }
+
+    /** Reprendre une session : ses objets, estimations et observations reviennent en mémoire ; l'affinage continue. */
+    fun resumeSession(id: Long) {
+        io.execute {
+            val d = db ?: return@execute
+            try {
+                d.endSession(_status.value.sessionId, System.currentTimeMillis())
+                val devs = d.sessionDevices(id)
+                val obs = d.sessionObservations(id)
+                val est = d.sessionEstimates(id)
+                synchronized(obsById) { obsById.clear(); for ((k, v) in obs) obsById[k] = ArrayDeque(v) }
+                lastEstimateWrite.clear(); rtt.clear(); lastBearingAt.clear()
+                synchronized(samples) { samples.clear() }
+                _devices.value = devs.associateBy { it.id }
+                _estimates.value = est.mapValues { (_, r) -> Estimate(r.lat, r.lon, r.radius, r.n, r.persistence, locked = r.confirmed && r.radius < Estimator.LOCK_MAX_RADIUS_M) }
+                _trace.value = emptyList()
+                val info = d.sessions().firstOrNull { it.id == id }
+                _status.update { it.copy(sessionId = id, sessionStart = info?.start ?: System.currentTimeMillis(), wifiScans = 0) }
+                d.renameSession(id, info?.name ?: "session $id")
+                logLine("Session reprise : « ${info?.name} » — ${devs.size} objets, ${obs.values.sumOf { it.size }} observations")
+            } catch (e: Exception) { logLine("!! Reprise impossible : ${e.message}") }
+            refreshSessions()
+        }
+    }
+
+    fun setKnown(id: String, known: Boolean) {
+        io.execute {
+            val name = _devices.value[id]?.name ?: ""
+            try { if (known) db?.addWhitelist(id, name) else db?.removeWhitelist(id) } catch (_: Exception) {}
+            _whitelist.update { if (known) it + id else it - id }
+        }
+    }
+
+    /** Tout ce qui est vu maintenant devient « connu du lieu » : plus d'alerte dessus. */
+    fun markAllKnown() {
+        io.execute {
+            val ids = _devices.value.keys
+            try { for (id in ids) db?.addWhitelist(id, _devices.value[id]?.name ?: "") } catch (_: Exception) {}
+            _whitelist.update { it + ids }
+            logLine("Liste blanche : ${ids.size} objets marqués connus")
+        }
     }
 
     private fun openSession() {
@@ -115,7 +173,7 @@ object ScanRepository {
     }
 
     fun setAlerts(on: Boolean) = _status.update { it.copy(alertsOn = on) }
-    fun setHeading(deg: Float) = _status.update { it.copy(heading = deg) }
+    fun setHeading(deg: Float, pitch: Float? = null) = _status.update { it.copy(heading = deg, pitch = pitch ?: it.pitch) }
     fun setBaro(hpa: Float, altRelM: Float) = _status.update { it.copy(pressureHpa = hpa, baroAltM = altRelM) }
 
     /** Distance mesurée Wi-Fi RTT vers un AP (thread principal) → portée dans l'appareil et les observations. */
@@ -266,13 +324,13 @@ object ScanRepository {
             _estimates.update { it + (id to est) }
             if (est.lat != null && now - (lastEstimateWrite[id] ?: 0L) > 10_000) {
                 lastEstimateWrite[id] = now
-                try { db?.upsertEstimate(sessionId, id, est, now) } catch (_: Exception) {}
+                try { db?.upsertEstimate(sessionId, d, est, now) } catch (_: Exception) {}
             }
 
             if (prev == null) {
                 val tag = if (category.isPriority) "!! " else ""
                 logLine("$tag${kind.name} $id ${d.name.ifBlank { "<sans nom>" }} ${rssi}dBm ${vendor.ifBlank { "?" }} [${category.label}]")
-                if (category.isPriority && _status.value.alertsOn) beep()
+                if (category.isPriority && _status.value.alertsOn && id !in _whitelist.value) beep()
             }
         }
     }
@@ -311,6 +369,7 @@ object ScanRepository {
             _estimates.value = emptyMap()
             _trace.value = emptyList()
             openSession()
+            refreshSessions()
         }
     }
 }

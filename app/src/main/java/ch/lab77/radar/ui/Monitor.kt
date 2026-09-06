@@ -14,6 +14,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,6 +59,13 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
                 (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") + (if (it.locked) " · 🔒 stable" else "") + (if (it.bearingFix) " · △ triangulé" else "") } ?: " · pas encore positionné"),
             color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
+        val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
+        var aiming by rememberSaveable { mutableStateOf(false) }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
+            TextButton(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }
+        }
+        if (aiming) RangeFinderScreen(d, st) { aiming = false }
         WalkGuide(d, st, compact = !full)
         if (full) {
             if (e != null && e.lat != null) Text(

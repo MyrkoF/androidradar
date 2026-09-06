@@ -28,6 +28,10 @@ object SystemTweaks {
         try { Settings.Global.getInt(ctx.contentResolver, KEY) == 1 } catch (_: Exception) { null }
     }
 
+    /** Hauteur des yeux (cm) pour le télémètre par visée — réglable, défaut 160. */
+    fun eyeHeightCm(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt("eye_cm", 160)
+    fun setEyeHeightCm(ctx: Context, cm: Int) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("eye_cm", cm.coerceIn(80, 230)).apply()
+
     /** Préférence utilisateur : désactiver automatiquement la limitation pendant les relevés. */
     fun autoThrottle(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("auto_throttle", true)
     fun setAutoThrottle(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("auto_throttle", on).apply()

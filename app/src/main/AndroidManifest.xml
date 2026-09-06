@@ -14,6 +14,10 @@
     <!-- Bluetooth (Android 12+ : une seule permission de scan) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
+    <!-- Caméra : aperçu avec réticule pour le télémètre par visée seulement (#18) ; aucune image enregistrée -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- Podomètre (estime quand le GPS décroche, cahier §4 ter) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 

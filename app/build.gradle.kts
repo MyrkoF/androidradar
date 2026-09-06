@@ -12,8 +12,8 @@ android {
         applicationId = "ch.lab77.radar"
         minSdk = 33
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.2.5"
+        versionCode = 11
+        versionName = "0.2.6"
     }
 
     signingConfigs {
@@ -25,6 +25,15 @@ android {
             storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
             keyAlias = System.getenv("RELEASE_KEY_ALIAS")
             keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+    // Un seul APK arm64 (tous les Android 13+ visés le sont) : ~25 Mo au lieu de 93 avec les 4 ABI de MapLibre
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
     buildTypes {
@@ -64,5 +73,10 @@ dependencies {
     // Carte : MapLibre Native (BSD-2) ; seul le package map/ touche au réseau (cahier §8)
     implementation("org.maplibre.gl:android-sdk:13.6.0")
     implementation("org.maplibre.gl:android-sdk-turf:6.0.1")
+    // Télémètre par visée : aperçu caméra avec réticule (#18)
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
     testImplementation("junit:junit:4.13.2")
 }

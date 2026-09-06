@@ -139,7 +139,10 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         if (now - lastHeadingPush >= 200) {
             lastHeadingPush = now
             val h = ((Math.toDegrees(atan2(sinSum, cosSum)) + 360.0) % 360.0).toFloat()
-            ScanRepository.setHeading(h)
+            // Élévation de l'axe de la caméra arrière (−Z de l'appareil) : asin(−R[8]), négatif = vers le bas.
+            // Indépendant de la rotation d'écran → télémètre par visée.
+            val pitch = Math.toDegrees(kotlin.math.asin((-rot[8]).toDouble().coerceIn(-1.0, 1.0))).toFloat()
+            ScanRepository.setHeading(h, pitch)
         }
     }
 

@@ -1,0 +1,5 @@
+- Scrollable Session screen in sections (export buttons had fallen below the screen edge)
+- Sessions: list, resume (refinement continues with stored observations), rename, delete, compare two visits (new / gone / moved / changed) and export the diff
+- Whitelist: "Known" in the monitor, "Mark all known" — no more beep for what belongs to the place
+- Aim rangefinder: "◎ Aim" in the monitor, camera preview with reticle, adjustable eye height, the recorded distance refines the position
+- arm64-only APK (~25 MB)
