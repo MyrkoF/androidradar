@@ -40,6 +40,7 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
     private var lastBaroPush = 0L
     private var steps = 0
     private var lastStepAt = 0L
+    private val lastRealFixAt: Long get() = ScanRepository.lastRealFixAt
 
     /** Résumé de disponibilité pour l'écran Session. */
     fun availability(rtt: Boolean?): String = buildString {
@@ -123,7 +124,8 @@ class PhoneSensors(ctx: Context) : Sensor, SensorEventListener {
         val st = ScanRepository.status.value
         val loc = ScanRepository.location ?: return
         val heading = st.heading ?: return
-        val gpsFresh = !st.deadReckoning && now - loc.time < 10_000 && (loc.accuracy <= 40f)
+        // Un fix GPS de moins de 20 s (même moyen) garde la main ; l'estime ne prend le relais qu'après
+        val gpsFresh = (!st.deadReckoning && now - loc.time < 20_000) || (st.deadReckoning && now - lastRealFixAt < 20_000)
         ScanRepository.setStatus { it.copy(steps = steps) }
         if (gpsFresh) return
         val p = Estimator.advance(loc.latitude, loc.longitude, heading, 0.72)

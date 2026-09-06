@@ -32,15 +32,29 @@ object GeoJson {
                 addStringProperty("color", kindHex(d.kind))
                 addStringProperty("stroke", when { d.category.isPriority -> "#FF5C5C"; e.rttFix -> "#FFB74D"; else -> "#FFFFFF" })
                 addNumberProperty("r", when { d.id == selected -> 11f; d.category.isPriority -> 9f; else -> 6f })
-                addNumberProperty("op", if (e.persistence == Persistence.UNKNOWN) 0.55f else 1f)
+                addNumberProperty("op", when {
+                    selected != null && d.id != selected -> 0.3f          // un objet sélectionné : les autres s'estompent
+                    e.persistence == Persistence.UNKNOWN -> 0.55f
+                    else -> 1f
+                })
                 addStringProperty("label", if (d.category.isPriority || d.id == selected) d.name.ifBlank { d.vendor } else "")
             }
         })
 
-    fun uncertainty(placed: List<Pair<Device, Estimate>>): FeatureCollection =
-        FeatureCollection.fromFeatures(placed.map { (d, e) ->
+    /** Cercle d'incertitude de l'objet sélectionné seulement — 80 cercles de 100 m rendent la carte illisible. */
+    fun uncertainty(placed: List<Pair<Device, Estimate>>, selected: String?): FeatureCollection =
+        FeatureCollection.fromFeatures(placed.filter { it.first.id == selected }.map { (d, e) ->
             val circle = TurfTransformation.circle(Point.fromLngLat(e.lon!!, e.lat!!), e.radius.toDouble(), 48, TurfConstants.UNIT_METERS)
             Feature.fromGeometry(circle).apply { addStringProperty("color", kindHex(d.kind)) }
+        })
+
+    /** Observations de l'objet sélectionné : d'où il a été vu, taille = signal. Rend le raisonnement visible. */
+    fun observations(obs: List<ch.lab77.radar.data.Obs>, kind: Kind): FeatureCollection =
+        FeatureCollection.fromFeatures(obs.map { o ->
+            Feature.fromGeometry(Point.fromLngLat(o.lon, o.lat)).apply {
+                addStringProperty("color", kindHex(kind))
+                addNumberProperty("r", (2f + 6f * ((o.rssi + 100).coerceIn(0, 70) / 70f)))
+            }
         })
 
     fun trace(points: List<DoubleArray>): FeatureCollection =

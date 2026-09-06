@@ -120,6 +120,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             }
             m.setStyle(Style.Builder().fromUri(MapConfig.STYLE_URL)) { style ->
                 style.addSource(GeoJsonSource("uncert"))
+                style.addSource(GeoJsonSource("obs"))
                 style.addSource(GeoJsonSource("trace"))
                 style.addSource(GeoJsonSource("devices"))
                 style.addSource(GeoJsonSource("me"))
@@ -127,6 +128,10 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                     PropertyFactory.fillColor(Expression.toColor(Expression.get("color"))), PropertyFactory.fillOpacity(0.10f)))
                 style.addLayer(LineLayer("uncert-line", "uncert").withProperties(
                     PropertyFactory.lineColor(Expression.toColor(Expression.get("color"))), PropertyFactory.lineWidth(1f), PropertyFactory.lineOpacity(0.5f)))
+                style.addLayer(CircleLayer("obs", "obs").withProperties(
+                    PropertyFactory.circleColor(Expression.toColor(Expression.get("color"))),
+                    PropertyFactory.circleRadius(Expression.get("r")), PropertyFactory.circleOpacity(0.5f),
+                    PropertyFactory.circleStrokeColor("#0B1215"), PropertyFactory.circleStrokeWidth(0.5f)))
                 style.addLayer(LineLayer("trace-line", "trace").withProperties(
                     PropertyFactory.lineColor("#3DDC97"), PropertyFactory.lineWidth(3f), PropertyFactory.lineOpacity(0.7f)))
                 style.addLayer(CircleLayer("devices", "devices").withProperties(
@@ -160,7 +165,10 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             val style = map?.style ?: return@collect
             val placed = GeoJson.placed(devs, ests, flags.first, ViewFilter::accepts)
             style.getSourceAs<GeoJsonSource>("devices")?.setGeoJson(GeoJson.devices(placed, flags.second))
-            style.getSourceAs<GeoJsonSource>("uncert")?.setGeoJson(GeoJson.uncertainty(placed))
+            style.getSourceAs<GeoJsonSource>("uncert")?.setGeoJson(GeoJson.uncertainty(placed, flags.second))
+            val selDev = flags.second?.let { devs[it] }
+            style.getSourceAs<GeoJsonSource>("obs")?.setGeoJson(
+                if (selDev != null) GeoJson.observations(ScanRepository.observationsOf(selDev.id), selDev.kind) else GeoJson.observations(emptyList(), ch.lab77.radar.data.Kind.WIFI))
         }
     }
     LaunchedEffect(styleReady) {
@@ -182,7 +190,11 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-            Box(Modifier.align(Alignment.TopEnd).padding(4.dp).background(Palette.surface.copy(alpha = 0.85f))) { FilterMenu() }
+            Column(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalAlignment = Alignment.End) {
+                Box(Modifier.background(Palette.surface.copy(alpha = 0.85f))) { FilterMenu() }
+                val sel = selected?.let { devices[it] }
+                if (sel != null) Box(Modifier.padding(top = 4.dp)) { Monitor(sel, estimates[sel.id], st) { selected = null } }
+            }
         }
         val placedCount = remember(devices, estimates, showAll) { GeoJson.placed(devices, estimates, showAll, ViewFilter::accepts).size }
         Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
@@ -191,32 +203,18 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 FilterChip(selected = followMe, onClick = {
                     followMe = true
                     if (st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
-                }, label = { Text("⌖ Moi") })
-                FilterChip(selected = headUp, enabled = st.heading != null, onClick = { headUp = !headUp; if (headUp) followMe = true }, label = { Text("Cap") })
-                FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaire") })
-                FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Zones hors ligne") })
+                }, label = { Text("Suivre") })
+                FilterChip(selected = headUp, enabled = st.heading != null, onClick = { headUp = !headUp; if (headUp) followMe = true }, label = { Text("Orienter") })
+                FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaires") })
+                FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Hors ligne") })
             }
             Text(
-                "$placedCount posés · ● Wi-Fi ● BLE ● Cell · cercle = incertitude · estompé = indéterminé · " +
-                    (if (showAll) "tout affiché" else "passants et MAC aléatoires masqués") + " · ${MapConfig.ATTRIBUTION}",
+                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue\n" +
+                    "$placedCount posés · ● Wi-Fi ● BLE ● Cell · anneau rouge = à surveiller · estompé = indéterminé · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
+                    MapConfig.ATTRIBUTION,
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
             )
             if (panel) OfflinePanel(map, maxZoom, { maxZoom = it }, progress, regions)
-            val sel = selected?.let { devices[it] }
-            if (sel != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(sel.name.ifBlank { sel.vendor.ifBlank { sel.id } }, color = Palette.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { selected = null }) { Text("✕") }
-                }
-                val e = estimates[sel.id]
-                if (e != null && e.lat != null) Text(
-                    (if (e.rttFix) "Position TRILATÉRÉE (RTT) " else "Position estimée ") + "${"%.5f".format(e.lat)}, ${"%.5f".format(e.lon)} ±${e.radius.toInt()} m · ${e.n} obs · ${e.persistence.label}" +
-                        (e.altM?.let { " · Δalt ${"%+.0f".format(it)} m (≈ ${"%+.0f".format(it / 3)} étage)" } ?: ""),
-                    color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp
-                )
-                DeviceDetail(sel)
-                WalkGuide(sel, st)
-            }
         }
     }
 }

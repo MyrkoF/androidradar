@@ -74,8 +74,12 @@ object ScanRepository {
     fun setStatus(f: (ScanStatus) -> ScanStatus) = _status.update(f)
 
     /** Position du téléphone. `estimated` = à l'estime (pas + cap), jamais confondue avec un fix GPS. */
+    @Volatile var lastRealFixAt = 0L
+        private set
+
     fun setLocation(loc: Location, estimated: Boolean = false) {
         location = loc
+        if (!estimated) lastRealFixAt = System.currentTimeMillis()
         _status.update {
             it.copy(gpsFix = !estimated, deadReckoning = estimated, lat = loc.latitude, lon = loc.longitude,
                 altitude = if (loc.hasAltitude()) loc.altitude else null,
@@ -110,6 +114,9 @@ object ScanRepository {
 
     /** Derniers échantillons (60 s) d'un appareil, pour le guide de marche. */
     fun samplesOf(id: String): List<Sample> = synchronized(samples) { samples[id]?.toList() ?: emptyList() }
+
+    /** Observations géolocalisées d'un appareil — pour montrer sur la carte d'où il a été vu. */
+    fun observationsOf(id: String): List<Obs> = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
 
     fun logLine(s: String) { _log.tryEmit(s) }
 
@@ -163,13 +170,13 @@ object ScanRepository {
             try { db?.upsert(d, prev == null, prev != null && rssi > prev.bestRssi, sessionId) } catch (_: Exception) {}
 
             // Estimation de position : une observation par relevé géolocalisé
-            if (loc != null) {
+            if (loc != null) synchronized(obsById) {
                 val list = obsById.getOrPut(id) { ArrayDeque() }
                 val fresh = rtt[id]?.first   // distance mesurée récente (RTT toutes les ~12 s)
                 list.addLast(Obs(now, loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 30f, rssi, _status.value.baroAltM, fresh))
                 while (list.size > Estimator.MAX_OBS) list.removeFirst()
             }
-            val obs = obsById[id] ?: emptyList<Obs>()
+            val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
             val est = Estimator.estimate(obs.toList(), kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs.toList(), kind))
             _estimates.update { it + (id to est) }
             if (est.lat != null && now - (lastEstimateWrite[id] ?: 0L) > 10_000) {
@@ -193,7 +200,7 @@ object ScanRepository {
             val cur = _estimates.value
             var next = cur
             for ((id, d) in devs) {
-                val obs = obsById[id]?.toList() ?: emptyList()
+                val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
                 val p = Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, d.kind)
                 val e = cur[id]
                 if (e == null) next = next + (id to Estimator.estimate(obs, d.kind, p))
@@ -213,7 +220,7 @@ object ScanRepository {
     fun clearSession() {
         io.execute {
             try { db?.endSession(_status.value.sessionId, System.currentTimeMillis()) } catch (_: Exception) {}
-            obsById.clear(); lastEstimateWrite.clear(); rtt.clear()
+            synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear()
             synchronized(samples) { samples.clear() }
             _devices.value = emptyMap()
             _estimates.value = emptyMap()

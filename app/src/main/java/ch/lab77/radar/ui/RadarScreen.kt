@@ -39,7 +39,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
-import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanStatus
 import kotlin.math.cos
 import kotlin.math.pow
@@ -52,9 +51,9 @@ import kotlin.math.sin
  * (exposant 1,4) pour écarter les signaux faibles, qui sont les plus nombreux. Pincer ou boutons pour zoomer ;
  * tap sur un point → fiche détail. Le radar tient toujours dans l'écran.
  */
-private const val CENTER_DBM = -30f
-private const val SPAN_MIN = 20f
-private const val SPAN_MAX = 70f
+private const val EDGE_DBM = -100f          // le bord ne bouge pas : c'est le centre que le zoom repousse
+private const val CENTER_MIN = -85f         // zoom max : la bande -85…-100 remplit le disque
+private const val CENTER_MAX = -30f
 private const val CURVE = 1.4
 
 @Composable
@@ -63,31 +62,33 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
     val sweep by transition.animateFloat(
         0f, 360f, infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "angle"
     )
-    var span by rememberSaveable { mutableFloatStateOf(65f) }   // dBm entre le centre et le bord (65 → bord = -95)
+    var center by rememberSaveable { mutableFloatStateOf(CENTER_MAX) }   // dBm au centre ; le bord est fixe à -100
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    val outer = (CENTER_DBM - span).toInt()
+    val span = center - EDGE_DBM
     val active = devices.values.filter { it.ageMs < 120_000 && ViewFilter.accepts(it) }
-    val visible = active.filter { it.rssi >= outer }
+    val visible = active.filter { it.rssi <= center.toInt() + 3 }   // les plus forts que le centre sortent du disque
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { span = (span + 10f).coerceAtMost(SPAN_MAX) }, enabled = span < SPAN_MAX) { Text("−") }
-            OutlinedButton(onClick = { span = (span - 10f).coerceAtLeast(SPAN_MIN) }, enabled = span > SPAN_MIN) { Text("+") }
-            Text("bord $outer dBm · ${visible.size}/${active.size}", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { center = (center + 10f).coerceAtMost(CENTER_MAX) }, enabled = center < CENTER_MAX) { Text("−") }
+            OutlinedButton(onClick = { center = (center - 10f).coerceAtLeast(CENTER_MIN) }, enabled = center > CENTER_MIN) { Text("+") }
+            Text("fenêtre ${center.toInt()}…${EDGE_DBM.toInt()} dBm · ${visible.size}/${active.size}", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
             FilterMenu()
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
+            val sel = selected?.let { devices[it] }
+            if (sel != null) Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { Monitor(sel, null, st) { selected = null } }
             Canvas(
                 Modifier.fillMaxSize()
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoom, _ -> span = (span / zoom).coerceIn(SPAN_MIN, SPAN_MAX) }
+                        detectTransformGestures { _, _, zoom, _ -> center = (EDGE_DBM + (center - EDGE_DBM) / zoom).coerceIn(CENTER_MIN, CENTER_MAX) }
                     }
-                    .pointerInput(visible, span) {
+                    .pointerInput(visible, center) {
                         detectTapGestures { pos ->
                             val c = Offset(size.width / 2f, size.height / 2f)
                             val r = minOf(size.width, size.height) / 2f - 10.dp.toPx()
-                            val hit = visible.minByOrNull { (pointFor(it, c, r, span) - pos).getDistance() }
-                            selected = if (hit != null && (pointFor(hit, c, r, span) - pos).getDistance() < 28.dp.toPx()) hit.id else null
+                            val hit = visible.minByOrNull { (pointFor(it, c, r, center) - pos).getDistance() }
+                            selected = if (hit != null && (pointFor(hit, c, r, center) - pos).getDistance() < 28.dp.toPx()) hit.id else null
                         }
                     }
             ) {
@@ -103,7 +104,7 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                     val frac = k / 4f
                     val rk = r * frac
                     drawCircle(Palette.grid, rk, c, style = Stroke(1.dp.toPx()))
-                    val dbm = (CENTER_DBM - span * frac.toDouble().pow(1 / CURVE).toFloat()).toInt()
+                    val dbm = (center - span * frac.toDouble().pow(1 / CURVE).toFloat()).toInt()
                     drawContext.canvas.nativeCanvas.drawText("$dbm dBm ≈${approxDistance(dbm)}", c.x + 4f, c.y - rk - 3f, ringPaint)
                 }
                 drawLine(Palette.grid, Offset(c.x - r, c.y), Offset(c.x + r, c.y), 1.dp.toPx())
@@ -113,7 +114,7 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                 drawLine(Palette.green.copy(alpha = 0.6f), c, Offset(c.x + r * cos(rad).toFloat(), c.y + r * sin(rad).toFloat()), 2.dp.toPx())
 
                 for (d in visible) {
-                    val p = pointFor(d, c, r, span)
+                    val p = pointFor(d, c, r, center)
                     val col = kindColor(d.kind)
                     val alpha = if (d.ageMs < 30_000) 1f else 0.45f
                     val dotR = if (d.category.isPriority) 6.dp.toPx() else 4.dp.toPx()
@@ -133,28 +134,17 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                 Legend("● Wi-Fi", Palette.green); Legend("● BLE", Palette.blue); Legend("● Cell", Palette.orange); Legend("◎ à surveiller", Palette.red); Legend("estompé = vu > 30 s", Palette.muted)
             }
             Text(
-                "rayon = signal (≈ distance, ordre de grandeur) · angle arbitraire, stable par adresse · pincer = zoom · tap = détail",
+                "rayon = signal (≈ distance, ordre de grandeur) · angle arbitraire, stable par adresse · pincer ou ± = zoom (repousse le centre) · tap = moniteur",
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
             )
-            val sel = selected?.let { devices[it] }
-            if (sel != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    Text(
-                        sel.name.ifBlank { if (sel.kind == Kind.WIFI) "<SSID caché>" else "<sans nom>" },
-                        color = Palette.text, fontSize = 15.sp, modifier = Modifier.weight(1f)
-                    )
-                    OutlinedButton(onClick = { selected = null }) { Text("✕") }
-                }
-                DeviceDetail(sel)
-                WalkGuide(sel, st)
-            }
         }
     }
 }
 
-/** Rayon normalisé : (dB depuis le centre / span)^1,4 — plus de place pour les signaux faibles. */
-private fun pointFor(d: Device, c: Offset, r: Float, span: Float): Offset {
-    val x = ((-d.rssi - CENTER_DBM).coerceIn(0f, span) / span).toDouble().pow(CURVE).toFloat()
+/** Rayon normalisé dans la fenêtre [centre, -100] : (dB sous le centre / largeur)^1,4 — plus de place aux signaux faibles. */
+private fun pointFor(d: Device, c: Offset, r: Float, center: Float): Offset {
+    val span = center - EDGE_DBM
+    val x = ((center - d.rssi).coerceIn(0f, span) / span).toDouble().pow(CURVE).toFloat()
     val ang = Math.toRadians(angleFor(d.id).toDouble())
     return Offset(c.x + x * r * cos(ang).toFloat(), c.y + x * r * sin(ang).toFloat())
 }
