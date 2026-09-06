@@ -22,6 +22,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Demander à sortir de l'optimisation batterie (surcouches vivo/Xiaomi tuent sinon le service) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Aucune permission INTERNET : l'app ne peut physiquement pas parler au réseau -->
 
@@ -51,6 +53,7 @@
         <service
             android:name=".scan.ScanService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="location|connectedDevice" />
 
         <provider

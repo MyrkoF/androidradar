@@ -26,6 +26,12 @@ object ScanRepository {
     @Volatile var location: Location? = null
         private set
 
+    /** Horodatage du dernier résultat reçu par type — lu par le chien de garde du service. */
+    @Volatile var lastWifiResultAt = 0L
+        private set
+    @Volatile var lastBleResultAt = 0L
+        private set
+
     private var db: Db? = null
     private val io = Executors.newSingleThreadExecutor()
     private var tone: ToneGenerator? = null
@@ -55,6 +61,7 @@ object ScanRepository {
 
     /** Point d'entrée unique des scanners. Thread-safe par sérialisation sur `io`. */
     fun observe(kind: Kind, rawId: String, name: String?, rssi: Int, frequency: Int, capabilities: String, bleCompanyId: Int? = null) {
+        if (kind == Kind.WIFI) lastWifiResultAt = System.currentTimeMillis() else lastBleResultAt = System.currentTimeMillis()
         io.execute {
             val id = rawId.uppercase()
             val now = System.currentTimeMillis()

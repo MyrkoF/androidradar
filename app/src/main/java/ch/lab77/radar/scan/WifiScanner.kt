@@ -21,6 +21,7 @@ class WifiScanner(private val ctx: Context, private val intervalMs: Long = 8_000
     private val wifi = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
+    val isRunning: Boolean get() = running
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) { if (running) ingest() }

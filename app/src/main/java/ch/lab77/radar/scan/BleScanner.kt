@@ -15,6 +15,7 @@ class BleScanner(ctx: Context) {
     private val manager = ctx.applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private var scanner: BluetoothLeScanner? = null
     private var running = false
+    val isRunning: Boolean get() = running
 
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) = ingest(result)

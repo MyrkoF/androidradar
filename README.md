@@ -42,8 +42,9 @@ La base SQLite locale (`radar.db`, schéma inspiré de WiGLE) accumule toutes le
 
 ## Classification
 
-`data/Classifier.kt` : une regex par catégorie sur le nom du fabricant (table OUI Wireshark
-embarquée, `assets/oui.tsv`). À enrichir au fil des relevés — c'est volontairement lisible.
+`data/Classifier.kt` : une ligne par fabricant → une seule catégorie, correspondance sur mot entier dans
+le nom long de la table OUI (`assets/oui.tsv`). Un test unitaire (`ClassifierTest`, lancé en CI) refuse
+les doublons et les règles masquées. À enrichir au fil des relevés — c'est volontairement lisible.
 
 Catégories : routeur cellulaire, flotte/télématique, caméra, infra réseau, industriel/IoT pro,
 grand public, MAC aléatoire, inconnu. Prioritaire = les cinq premières.
@@ -52,8 +53,8 @@ grand public, MAC aléatoire, inconnu. Prioritaire = les cinq premières.
 
 - Adresses BLE aléatoires (la majorité des téléphones) : pas de fabricant via OUI ; on utilise
   l'identifiant d'entreprise Bluetooth SIG quand il est présent dans l'annonce (table partielle).
-- Table OUI datée de 2022 : remplacer `assets/oui.tsv` (format `préfixe<TAB>court<TAB>long`)
-  à partir du fichier `manuf` de Wireshark pour la mettre à jour.
+- Table OUI : régénérée le 2026-09-06 depuis le fichier `manuf` de Wireshark. Pour la mettre à jour :
+  `python3 tools/update_oui.py` (télécharge la version courante et réécrit `assets/oui.tsv`).
 - Pas de carte : les positions sont dans les exports.
 
 ## Licence et attributions
