@@ -401,13 +401,15 @@ object ScanRepository {
 
     fun clearSession() {
         io.execute {
-            try { db?.endSession(_status.value.sessionId, System.currentTimeMillis()) } catch (_: Exception) {}
+            val oldId = _status.value.sessionId
+            try { db?.endSession(oldId, System.currentTimeMillis()) } catch (_: Exception) {}
             synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear(); lastBearingAt.clear()
             synchronized(samples) { samples.clear() }
             _devices.value = emptyMap()
             _estimates.value = emptyMap()
             _trace.value = emptyList()
             openSession()
+            logLine("Session $oldId clôturée → session ${_status.value.sessionId} ouverte (mesures ${if (_status.value.wifiOn || _status.value.bleOn || _status.value.cellOn) "en cours" else "arrêtées"})")
             refreshSessions()
         }
     }

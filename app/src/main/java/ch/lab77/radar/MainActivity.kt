@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
                     onBle = { on -> withPerms(allPerms()) { ScanService.send(this, if (on) ScanService.ACTION_BLE_ON else ScanService.ACTION_BLE_OFF) } },
                     onCell = { on -> withPerms(allPerms()) { ScanService.send(this, if (on) ScanService.ACTION_CELL_ON else ScanService.ACTION_CELL_OFF) } },
                     onQuit = { quitCleanly() },
+                    onStopAll = { ScanService.send(this, ScanService.ACTION_STOP) },
                 )
             }
         }

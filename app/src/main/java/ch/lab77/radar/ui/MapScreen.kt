@@ -210,16 +210,16 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
         val placedCount = remember(devices, estimates, showAll) { GeoJson.placed(devices, estimates, showAll, ViewFilter::accepts).size }
         Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = followMe, onClick = {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompactChip(followMe, {
                     followMe = true
                     if (st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
-                }, label = { Text("Suivre") })
-                FilterChip(selected = headUp, enabled = st.heading != null, onClick = { headUp = !headUp; if (headUp) followMe = true }, label = { Text("Orienter") })
-                FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaires") })
-                FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Hors ligne") })
-                FilterChip(selected = arOpen, onClick = { arOpen = true }, label = { Text("📷 Caméra") })
-                FilterChip(selected = CameraUse.thumb, onClick = { CameraUse.thumb = !CameraUse.thumb }, label = { Text("Vignette") })
+                }, "Suivre")
+                CompactChip(headUp, { headUp = !headUp; if (headUp) followMe = true }, "Orienter", enabled = st.heading != null)
+                CompactChip(showAll, { showAll = !showAll }, if (showAll) "Tout" else "Stationnaires")
+                CompactChip(panel, { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, "Hors ligne")
+                CompactChip(arOpen, { arOpen = true }, "📷 Caméra")
+                CompactChip(CameraUse.thumb, { CameraUse.thumb = !CameraUse.thumb }, "Vignette")
             }
             if (arOpen) ArScreen(selected?.let { devices[it] }) { arOpen = false }
             manual?.let { ll ->
@@ -254,7 +254,7 @@ private fun OfflinePanel(map: MapLibreMap?, maxZoom: Int, onZoom: (Int) -> Unit,
         Text("Réseau : ${NetworkState.describe(ctx)} · la vue actuelle devient une zone hors ligne (zoom $minZoom → $maxZoom, ≈ $tiles tuiles)",
             color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (z in listOf(13, 14, 15, 16)) FilterChip(selected = maxZoom == z, onClick = { onZoom(z) }, label = { Text("z$z") })
+            for (z in listOf(13, 14, 15, 16)) CompactChip(maxZoom == z, { onZoom(z) }, "z$z")
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(enabled = bounds != null && !downloading && !tooBig, onClick = {

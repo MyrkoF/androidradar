@@ -37,7 +37,7 @@ import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 
 @Composable
-fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -> Unit, onQuit: () -> Unit) {
+fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -> Unit, onQuit: () -> Unit, onStopAll: () -> Unit = {}) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val status by ScanRepository.status.collectAsStateWithLifecycle()
     val devices by ScanRepository.devices.collectAsStateWithLifecycle()
@@ -63,7 +63,7 @@ fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -
                 0 -> ListScreen(devices)
                 1 -> RadarScreen(devices, status)
                 2 -> MapScreen(devices, status)
-                else -> SessionScreen(devices, status, onQuit)
+                else -> SessionScreen(devices, status, onQuit, onStopAll)
             }
         }
     }
@@ -87,18 +87,11 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
             if (st.wifiOn && st.wifiThrottled)
                 Text("throttle", color = Palette.amber, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(selected = st.wifiOn, onClick = { onWifi(!st.wifiOn) },
-                label = { Text("Wi-Fi") }, leadingIcon = { Icon(Icons.Default.Wifi, null) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.green, selectedLabelColor = Palette.bg, selectedLeadingIconColor = Palette.bg))
-            FilterChip(selected = st.bleOn, onClick = { onBle(!st.bleOn) },
-                label = { Text("BLE") }, leadingIcon = { Icon(Icons.Default.Bluetooth, null) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.blue, selectedLabelColor = Palette.bg, selectedLeadingIconColor = Palette.bg))
-            FilterChip(selected = st.cellOn, onClick = { onCell(!st.cellOn) },
-                label = { Text("Cell") }, leadingIcon = { Icon(Icons.Default.CellTower, null) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.orange, selectedLabelColor = Palette.bg, selectedLeadingIconColor = Palette.bg))
-            FilterChip(selected = st.alertsOn, onClick = { ScanRepository.setAlerts(!st.alertsOn) },
-                label = { Text("Bip") })
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            CompactChip(st.wifiOn, { onWifi(!st.wifiOn) }, "Wi-Fi", selectedColor = Palette.green, leadingIcon = { Icon(Icons.Default.Wifi, null) })
+            CompactChip(st.bleOn, { onBle(!st.bleOn) }, "BLE", selectedColor = Palette.blue, leadingIcon = { Icon(Icons.Default.Bluetooth, null) })
+            CompactChip(st.cellOn, { onCell(!st.cellOn) }, "Cell", selectedColor = Palette.orange, leadingIcon = { Icon(Icons.Default.CellTower, null) })
+            CompactChip(st.alertsOn, { ScanRepository.setAlerts(!st.alertsOn) }, "Bip")
         }
     }
 }

@@ -61,7 +61,7 @@ import java.util.Locale
  * batterie, réglages du téléphone, journal.
  */
 @Composable
-fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Unit) {
+fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Unit, onStopAll: () -> Unit = {}) {
     val ctx = LocalContext.current
     val all = devices.values
     var log by remember { mutableStateOf(listOf<String>()) }
@@ -84,7 +84,7 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
         }
         item { BatteryBanner(st) }
         item { ArStatusLine() }
-        item { Section("Exports (CSV, GeoJSON, JSON, débrief, diagnostic)", openExports, { openExports = !openExports }) { ExportsPanel(all, st) } }
+        item { Section("Exports (CSV, GeoJSON, JSON, débrief, diagnostic)", openExports, { openExports = !openExports }) { ExportsPanel(all, st, onStopAll) } }
         item { Section("Sessions (reprendre, renommer, comparer deux visites, liste blanche)", openSessions, { openSessions = !openSessions; if (openSessions) ScanRepository.refreshSessions() }) { SessionsPanel(st, all.size) } }
         item { Section("Réglages (hauteur des yeux, limitation Wi-Fi, raccourcis, quitter)", openSettings, { openSettings = !openSettings }) { SettingsPanel(st, onQuit) } }
         item { Section("Journal", openJournal, { openJournal = !openJournal }) {} }
@@ -106,8 +106,9 @@ private fun Section(title: String, open: Boolean, onToggle: () -> Unit, content:
 }
 
 @Composable
-private fun ExportsPanel(all: Collection<Device>, st: ScanStatus) {
+private fun ExportsPanel(all: Collection<Device>, st: ScanStatus, onStopAll: () -> Unit) {
     val ctx = LocalContext.current
+    var confirmNew by remember { mutableStateOf(false) }
     var clean by rememberSaveable { mutableStateOf(true) }
     val sel = Exporter.select(all, clean)
     val trace by ScanRepository.trace.collectAsStateWithLifecycle()
@@ -130,8 +131,17 @@ private fun ExportsPanel(all: Collection<Device>, st: ScanStatus) {
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         OutlinedButton(onClick = { Exporter.share(ctx, Exporter.fileName("diag.json"), "application/json", Exporter.diagnostic(ctx, all, st)) }) { Text("Diagnostic") }
-        OutlinedButton(onClick = { ScanRepository.clearSession() }) { Text("Nouvelle session") }
+        OutlinedButton(onClick = { confirmNew = true }) { Text("Nouvelle session") }
+        OutlinedButton(onClick = onStopAll, enabled = st.wifiOn || st.bleOn || st.cellOn, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Arrêter les relevés") }
     }
+    Text("Les puces Wi-Fi / BLE / Cell en haut démarrent et arrêtent les mesures. « Nouvelle session » = nouveau lieu ou nouvelle visite.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+    if (confirmNew) AlertDialog(
+        onDismissRequest = { confirmNew = false },
+        confirmButton = { TextButton(onClick = { ScanRepository.clearSession(); confirmNew = false }) { Text("Ouvrir une nouvelle session") } },
+        dismissButton = { TextButton(onClick = { confirmNew = false }) { Text("Annuler") } },
+        title = { Text("Nouvelle session ?") },
+        text = { Text("La session en cours est clôturée en base (ses positions et observations sont conservées, tu pourras la reprendre ou la comparer). L'écran repart à zéro. Les mesures continuent si les puces sont actives. Le journal n'est pas effacé.") }
+    )
     val counts = ScanRepository.db()?.let { runCatching { it.counts() }.getOrNull() }
     if (counts != null) Text("Base : ${counts.first} appareils, ${counts.second} observations", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
 }

@@ -1,0 +1,1 @@
+- Compact buttons for small screens; "New session" explains and asks for confirmation; "Stop surveys" button in Session
