@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -33,6 +35,7 @@ import ch.lab77.radar.data.ScanStatus
  * Moniteur de l'objet sélectionné : petit encadré en haut à droite, par-dessus la carte ou le radar,
  * toujours visible en marchant (retour terrain n°3, #10). Guide de marche compact, fiche complète sur ⓘ.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
     var full by rememberSaveable { mutableStateOf(false) }
@@ -62,7 +65,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
         var aiming by rememberSaveable { mutableStateOf(false) }
         var ar by rememberSaveable { mutableStateOf(false) }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
             TextButton(onClick = { ar = true }) { Text("📷 Pointer") }
             TextButton(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }

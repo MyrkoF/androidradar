@@ -1,0 +1,1 @@
+- Map and monitor buttons now wrap ("Camera", "Aim", "Point" were cut off-screen); explicit Session sections, Settings open

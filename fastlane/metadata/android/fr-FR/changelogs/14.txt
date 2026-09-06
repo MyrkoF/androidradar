@@ -1,0 +1,1 @@
+- Boutons de la carte et du moniteur qui passent à la ligne (« 📷 Caméra », « ◎ Viser », « 📷 Pointer » étaient coupés hors écran) ; sections de Session explicites, Réglages ouverts

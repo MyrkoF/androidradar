@@ -68,7 +68,7 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
     LaunchedEffect(Unit) { ScanRepository.log.collect { line -> log = (listOf(line) + log).take(200) } }
     var openExports by rememberSaveable { mutableStateOf(true) }
     var openSessions by rememberSaveable { mutableStateOf(false) }
-    var openSettings by rememberSaveable { mutableStateOf(false) }
+    var openSettings by rememberSaveable { mutableStateOf(true) }
     var openJournal by rememberSaveable { mutableStateOf(true) }
     val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
 
@@ -83,9 +83,9 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
             )
         }
         item { BatteryBanner(st) }
-        item { Section("Exports", openExports, { openExports = !openExports }) { ExportsPanel(all, st) } }
-        item { Section("Sessions et comparaison", openSessions, { openSessions = !openSessions; if (openSessions) ScanRepository.refreshSessions() }) { SessionsPanel(st, all.size) } }
-        item { Section("Réglages du téléphone", openSettings, { openSettings = !openSettings }) { SettingsPanel(st, onQuit) } }
+        item { Section("Exports (CSV, GeoJSON, JSON, débrief, diagnostic)", openExports, { openExports = !openExports }) { ExportsPanel(all, st) } }
+        item { Section("Sessions (reprendre, renommer, comparer deux visites, liste blanche)", openSessions, { openSessions = !openSessions; if (openSessions) ScanRepository.refreshSessions() }) { SessionsPanel(st, all.size) } }
+        item { Section("Réglages (hauteur des yeux, limitation Wi-Fi, raccourcis, quitter)", openSettings, { openSettings = !openSettings }) { SettingsPanel(st, onQuit) } }
         item { Section("Journal", openJournal, { openJournal = !openJournal }) {} }
         if (openJournal) items(log) { line ->
             Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = if (line.startsWith("!!")) Palette.amber else Palette.text,
@@ -98,7 +98,7 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
 @Composable
 private fun Section(title: String, open: Boolean, onToggle: () -> Unit, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text((if (open) "▾ " else "▸ ") + title, color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+        Text((if (open) "▾ " else "▸ ") + title + (if (open) "" else "  — toucher pour ouvrir"), color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle))
         if (open) content()
     }

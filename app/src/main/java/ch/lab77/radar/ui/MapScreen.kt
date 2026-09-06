@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -66,7 +68,7 @@ import java.util.Locale
  * Par défaut seuls les objets stationnaires (et indéterminés, estompés) sont posés (cahier §3 bis).
  * Téléchargement d'emprise explicite (cahier §8).
  */
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     val ctx = LocalContext.current
@@ -202,7 +204,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
         val placedCount = remember(devices, estimates, showAll) { GeoJson.placed(devices, estimates, showAll, ViewFilter::accepts).size }
         Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = followMe, onClick = {
                     followMe = true
                     if (st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
@@ -223,7 +225,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 )
             }
             Text(
-                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore · appui long = « Je suis ici »\n" +
+                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore (Google Play Services for AR requis) · appui long sur la carte = « Je suis ici » · tap un objet → moniteur : ◎ Viser, 📷 Pointer, Connu\n" +
                     "$placedCount posés · ● Wi-Fi ● BLE ● Cell · anneau rouge = à surveiller · estompé = indéterminé · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
                     MapConfig.ATTRIBUTION,
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
