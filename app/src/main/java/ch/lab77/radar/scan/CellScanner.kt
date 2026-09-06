@@ -68,6 +68,9 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
         ScanRepository.logLine("Cell : relevé arrêté")
     }
 
+    /** Les champs indisponibles valent Int.MAX_VALUE : on affiche « — ». */
+    private fun v(x: Int): String = if (x == CellInfo.UNAVAILABLE || x == Int.MAX_VALUE) "—" else x.toString()
+
     private fun ingest(list: List<CellInfo>) {
         val operatorDefault = tm.networkOperatorName ?: ""
         for (ci in list) {
@@ -78,7 +81,7 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
                     val cell = if (id.ci != CellInfo.UNAVAILABLE) "LTE-$plmn-${id.ci}" else "LTE-$plmn-pci${id.pci}-${id.earfcn}"
                     val op = id.operatorAlphaLong?.toString()?.ifBlank { null } ?: operatorDefault
                     val band = id.bands.firstOrNull()?.let { "b$it " } ?: ""
-                    val caps = "tech=LTE ${band}pci=${id.pci} tac=${id.tac} earfcn=${id.earfcn} rsrq=${s.rsrq} sinr=${s.rssnr} ta=${s.timingAdvance}" + (if (ci.isRegistered) " registered" else "")
+                    val caps = "tech=LTE ${band}pci=${v(id.pci)} tac=${v(id.tac)} earfcn=${id.earfcn} rsrq=${v(s.rsrq)} sinr=${v(s.rssnr)} ta=${v(s.timingAdvance)}" + (if (ci.isRegistered) " registered" else "")
                     ScanRepository.observe(Kind.CELL, cell, "LTE $op ${band}PCI ${id.pci}", s.rsrp, id.earfcn, caps, vendorOverride = op)
                 }
                 is CellInfoNr -> {
@@ -87,7 +90,7 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
                     val cell = if (id.nci != CellInfo.UNAVAILABLE_LONG) "NR-$plmn-${id.nci}" else "NR-$plmn-pci${id.pci}-${id.nrarfcn}"
                     val op = id.operatorAlphaLong?.toString()?.ifBlank { null } ?: operatorDefault
                     val band = id.bands.firstOrNull()?.let { "n$it " } ?: ""
-                    val caps = "tech=NR ${band}pci=${id.pci} tac=${id.tac} nrarfcn=${id.nrarfcn} rsrq=${s.ssRsrq} sinr=${s.ssSinr}" + (if (ci.isRegistered) " registered" else "")
+                    val caps = "tech=NR ${band}pci=${v(id.pci)} tac=${v(id.tac)} nrarfcn=${id.nrarfcn} rsrq=${v(s.ssRsrq)} sinr=${v(s.ssSinr)}" + (if (ci.isRegistered) " registered" else "")
                     ScanRepository.observe(Kind.CELL, cell, "5G $op ${band}PCI ${id.pci}", s.ssRsrp, id.nrarfcn, caps, vendorOverride = op)
                 }
                 is CellInfoWcdma -> {
@@ -95,7 +98,7 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
                     val plmn = (id.mccString ?: "?") + (id.mncString ?: "?")
                     val cell = if (id.cid != CellInfo.UNAVAILABLE) "WCDMA-$plmn-${id.cid}" else "WCDMA-$plmn-psc${id.psc}-${id.uarfcn}"
                     val op = id.operatorAlphaLong?.toString()?.ifBlank { null } ?: operatorDefault
-                    val caps = "tech=WCDMA psc=${id.psc} lac=${id.lac} uarfcn=${id.uarfcn}" + (if (ci.isRegistered) " registered" else "")
+                    val caps = "tech=WCDMA psc=${v(id.psc)} lac=${v(id.lac)} uarfcn=${id.uarfcn}" + (if (ci.isRegistered) " registered" else "")
                     ScanRepository.observe(Kind.CELL, cell, "3G $op PSC ${id.psc}", s.dbm, id.uarfcn, caps, vendorOverride = op)
                 }
                 is CellInfoGsm -> {
@@ -103,7 +106,7 @@ class CellScanner(ctx: Context, private val intervalMs: Long = 10_000L) : Sensor
                     val plmn = (id.mccString ?: "?") + (id.mncString ?: "?")
                     val cell = if (id.cid != CellInfo.UNAVAILABLE) "GSM-$plmn-${id.cid}" else "GSM-$plmn-arfcn${id.arfcn}-${id.bsic}"
                     val op = id.operatorAlphaLong?.toString()?.ifBlank { null } ?: operatorDefault
-                    val caps = "tech=GSM lac=${id.lac} arfcn=${id.arfcn} bsic=${id.bsic}" + (if (ci.isRegistered) " registered" else "")
+                    val caps = "tech=GSM lac=${v(id.lac)} arfcn=${id.arfcn} bsic=${v(id.bsic)}" + (if (ci.isRegistered) " registered" else "")
                     ScanRepository.observe(Kind.CELL, cell, "2G $op ARFCN ${id.arfcn}", s.dbm, id.arfcn, caps, vendorOverride = op)
                 }
             }

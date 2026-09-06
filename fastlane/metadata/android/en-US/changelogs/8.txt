@@ -1,0 +1,3 @@
+- A precise GPS fix always overrides dead reckoning (no more straight-line drift after a few steps)
+- BLE: "unknown RSSI" (+127) readings ignored — they looked like the strongest signals
+- Cells: unavailable values shown as "—"

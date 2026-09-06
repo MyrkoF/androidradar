@@ -1,0 +1,3 @@
+- Un fix GPS précis reprend toujours la main sur l'estime (fin de la dérive en ligne droite après quelques pas)
+- BLE : les lectures « signal inconnu » (+127) sont ignorées — elles passaient pour les signaux les plus forts
+- Cellules : valeurs indisponibles affichées « — »

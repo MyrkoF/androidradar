@@ -63,6 +63,7 @@ class BleScanner(ctx: Context) : Sensor {
     }
 
     private fun ingest(r: ScanResult) {
+        if (r.rssi == 127 || r.rssi > 20) return   // 127 = « RSSI non disponible » (Android) : aucune information, on ignore
         val rec = r.scanRecord
         val name = rec?.deviceName
         var companyId: Int? = null
