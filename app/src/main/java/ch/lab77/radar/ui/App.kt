@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Radar
@@ -36,14 +37,14 @@ import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 
 @Composable
-fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
+fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -> Unit, onQuit: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val status by ScanRepository.status.collectAsStateWithLifecycle()
     val devices by ScanRepository.devices.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = Palette.bg,
-        topBar = { StatusBar(status, devices.size, onWifi, onBle) },
+        topBar = { StatusBar(status, devices.size, onWifi, onBle, onCell) },
         bottomBar = {
             NavigationBar(containerColor = Palette.surface) {
                 NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
@@ -60,25 +61,27 @@ fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
         Column(Modifier.fillMaxSize().padding(pad)) {
             when (tab) {
                 0 -> ListScreen(devices)
-                1 -> RadarScreen(devices)
+                1 -> RadarScreen(devices, status)
                 2 -> MapScreen(devices, status)
-                else -> SessionScreen(devices, status)
+                else -> SessionScreen(devices, status, onQuit)
             }
         }
     }
 }
 
 @Composable
-private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit) {
+private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -> Unit) {
     Column(Modifier.fillMaxWidth().background(Palette.surface).padding(horizontal = 12.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("RADAR", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             Text("$count", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 18.sp)
             val sats = if (st.satsVisible > 0) " ${st.satsUsed}/${st.satsVisible}sat" else ""
             Text(
-                (if (st.gpsFix) "GPS ±${st.accuracy?.toInt() ?: 0}m" else "GPS —") + sats,
-                color = if (st.gpsFix) Palette.green else Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace
+                (when { st.deadReckoning -> "ESTIME ±${st.accuracy?.toInt() ?: 0}m"; st.gpsFix -> "GPS ±${st.accuracy?.toInt() ?: 0}m"; else -> "GPS —" }) + sats,
+                color = when { st.deadReckoning -> Palette.amber; st.gpsFix -> Palette.green; else -> Palette.muted }, fontSize = 12.sp, fontFamily = FontFamily.Monospace
             )
+            if (st.heading != null) Text("↑${st.heading.toInt()}°", color = Palette.text, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            if (st.baroAltM != null) Text("Δ${"%+.0f".format(st.baroAltM)}m", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             if (st.wifiOn && st.wifiThrottled)
                 Text("throttle", color = Palette.amber, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
@@ -89,6 +92,9 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
             FilterChip(selected = st.bleOn, onClick = { onBle(!st.bleOn) },
                 label = { Text("BLE") }, leadingIcon = { Icon(Icons.Default.Bluetooth, null) },
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.blue, selectedLabelColor = Palette.bg, selectedLeadingIconColor = Palette.bg))
+            FilterChip(selected = st.cellOn, onClick = { onCell(!st.cellOn) },
+                label = { Text("Cell") }, leadingIcon = { Icon(Icons.Default.CellTower, null) },
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.orange, selectedLabelColor = Palette.bg, selectedLeadingIconColor = Palette.bg))
             FilterChip(selected = st.alertsOn, onClick = { ScanRepository.setAlerts(!st.alertsOn) },
                 label = { Text("Bip") })
         }

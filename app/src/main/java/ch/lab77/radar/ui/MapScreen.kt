@@ -80,6 +80,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     var followMe by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf(false) }
     var maxZoom by rememberSaveable { mutableStateOf(15) }
+    var headUp by rememberSaveable { mutableStateOf(false) }
     var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     val estimates by ScanRepository.estimates.collectAsStateWithLifecycle()
     val trace by ScanRepository.trace.collectAsStateWithLifecycle()
@@ -139,6 +140,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                     PropertyFactory.textSize(11f), PropertyFactory.textOffset(arrayOf(0f, 1.3f)),
                     PropertyFactory.textColor("#D9E4E8"), PropertyFactory.textHaloColor("#0B1215"), PropertyFactory.textHaloWidth(1.2f),
                     PropertyFactory.textOptional(true)))
+                style.addLayer(FillLayer("me-cone", "me").withProperties(
+                    PropertyFactory.fillColor("#5CB8FF"), PropertyFactory.fillOpacity(0.25f)))
                 style.addLayer(CircleLayer("me", "me").withProperties(
                     PropertyFactory.circleColor("#5CB8FF"), PropertyFactory.circleRadius(7f),
                     PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(2f)))
@@ -164,10 +167,16 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
         if (!styleReady) return@LaunchedEffect
         snapshotFlow { trace }.sample(2000).collect { map?.style?.getSourceAs<GeoJsonSource>("trace")?.setGeoJson(GeoJson.trace(it)) }
     }
-    LaunchedEffect(styleReady, st.lat, st.lon, followMe) {
+    val headingRounded = st.heading?.let { (it / 5).toInt() * 5 }
+    LaunchedEffect(styleReady, st.lat, st.lon, followMe, headingRounded, headUp) {
         if (!styleReady) return@LaunchedEffect
-        map?.style?.getSourceAs<GeoJsonSource>("me")?.setGeoJson(GeoJson.me(st.lat, st.lon))
-        if (followMe && st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLng(LatLng(st.lat, st.lon)))
+        map?.style?.getSourceAs<GeoJsonSource>("me")?.setGeoJson(GeoJson.me(st.lat, st.lon, st.heading))
+        val m = map ?: return@LaunchedEffect
+        if (followMe && st.lat != null && st.lon != null) {
+            if (headUp && headingRounded != null) m.animateCamera(CameraUpdateFactory.newCameraPosition(
+                org.maplibre.android.camera.CameraPosition.Builder().target(LatLng(st.lat, st.lon)).bearing(headingRounded.toDouble()).zoom(m.cameraPosition.zoom).build()))
+            else m.animateCamera(CameraUpdateFactory.newLatLng(LatLng(st.lat, st.lon)))
+        } else if (!headUp && m.cameraPosition.bearing != 0.0) m.animateCamera(CameraUpdateFactory.bearingTo(0.0))
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -183,11 +192,12 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                     followMe = true
                     if (st.lat != null && st.lon != null) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(st.lat, st.lon), 16.0))
                 }, label = { Text("⌖ Moi") })
+                FilterChip(selected = headUp, enabled = st.heading != null, onClick = { headUp = !headUp; if (headUp) followMe = true }, label = { Text("Cap") })
                 FilterChip(selected = showAll, onClick = { showAll = !showAll }, label = { Text(if (showAll) "Tout" else "Stationnaire") })
                 FilterChip(selected = panel, onClick = { panel = !panel; if (panel) OfflineRegions.refresh(ctx) }, label = { Text("Zones hors ligne") })
             }
             Text(
-                "$placedCount posés · ● Wi-Fi ● BLE · cercle = incertitude · estompé = indéterminé · " +
+                "$placedCount posés · ● Wi-Fi ● BLE ● Cell · cercle = incertitude · estompé = indéterminé · " +
                     (if (showAll) "tout affiché" else "passants et MAC aléatoires masqués") + " · ${MapConfig.ATTRIBUTION}",
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
             )
@@ -200,10 +210,12 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 }
                 val e = estimates[sel.id]
                 if (e != null && e.lat != null) Text(
-                    "Position estimée ${"%.5f".format(e.lat)}, ${"%.5f".format(e.lon)} ±${e.radius.toInt()} m · ${e.n} obs · ${e.persistence.label}",
+                    (if (e.rttFix) "Position TRILATÉRÉE (RTT) " else "Position estimée ") + "${"%.5f".format(e.lat)}, ${"%.5f".format(e.lon)} ±${e.radius.toInt()} m · ${e.n} obs · ${e.persistence.label}" +
+                        (e.altM?.let { " · Δalt ${"%+.0f".format(it)} m (≈ ${"%+.0f".format(it / 3)} étage)" } ?: ""),
                     color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
                 DeviceDetail(sel)
+                WalkGuide(sel, st)
             }
         }
     }

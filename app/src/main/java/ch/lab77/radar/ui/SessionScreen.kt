@@ -36,9 +36,13 @@ import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 import ch.lab77.radar.export.Exporter
 import ch.lab77.radar.map.NetworkState
+import ch.lab77.radar.scan.SystemTweaks
+import androidx.compose.material3.Switch
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 
 @Composable
-fun SessionScreen(devices: Map<String, Device>, st: ScanStatus) {
+fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Unit) {
     val ctx = LocalContext.current
     val all = devices.values
     var log by remember { mutableStateOf(listOf<String>()) }
@@ -54,10 +58,12 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus) {
             color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp
         )
         Text(
-            "Réseau : ${NetworkState.describe(ctx)} — utilisé uniquement pour les fonds de carte (onglet Carte)",
+            "Réseau : ${NetworkState.describe(ctx)} — utilisé uniquement pour les fonds de carte (onglet Carte)\n" +
+                "Capteurs : ${st.sensors.ifBlank { "(au démarrage d'un relevé)" }}" + (if (st.steps > 0) " · ${st.steps} pas" else ""),
             color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
         BatteryBanner(st)
+        SettingsPanel(st, onQuit)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { Exporter.share(ctx, Exporter.fileName("csv"), "text/csv", Exporter.wigleCsv(all)) },
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Palette.bg)) { Text("CSV WiGLE") }
@@ -116,6 +122,58 @@ private fun BatteryBanner(st: ScanStatus) {
         }
         if (guide) Text(GUIDE, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     }
+}
+
+/**
+ * Réglages système depuis l'app (issue #9) : état de la limitation du scan Wi-Fi, raccourcis vers les
+ * écrans système, désactivation automatique pendant les relevés si la permission a été accordée par ADB,
+ * sortie propre qui restaure tout.
+ */
+@Composable
+private fun SettingsPanel(st: ScanStatus, onQuit: () -> Unit) {
+    val ctx = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var throttle by remember { mutableStateOf(SystemTweaks.throttleEnabled(ctx)) }
+    var canWrite by remember { mutableStateOf(SystemTweaks.canWrite(ctx)) }
+    var auto by remember { mutableStateOf(SystemTweaks.autoThrottle(ctx)) }
+    LifecycleResumeEffect(Unit) {
+        throttle = SystemTweaks.throttleEnabled(ctx); canWrite = SystemTweaks.canWrite(ctx)
+        onPauseOrDispose { }
+    }
+    Column(Modifier.fillMaxWidth().background(Palette.surface).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Réglages du téléphone", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+        Text(
+            "Limitation du scan Wi-Fi (option développeur) : " + when (throttle) { true -> "ACTIVE — 4 scans / 2 min"; false -> "désactivée ✓"; null -> "inconnue" },
+            color = if (throttle == true) Palette.amber else Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+        )
+        if (canWrite) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = auto, onCheckedChange = { auto = it; SystemTweaks.setAutoThrottle(ctx, it) })
+                Text("Désactiver automatiquement pendant les relevés, restaurer à l'arrêt", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { SystemTweaks.setThrottle(ctx, false); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Désactiver maintenant") }
+                OutlinedButton(onClick = { SystemTweaks.setThrottle(ctx, true); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Rétablir") }
+            }
+        } else {
+            Text("Pour que l'app la bascule elle-même (une fois, en USB) :", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+            Text(SystemTweaks.ADB_GRANT, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(SystemTweaks.ADB_GRANT)) }) { Text("Copier") }
+                OutlinedButton(onClick = { open(ctx, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }) { Text("Options développeur") }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { try { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {} }) { Text("Infos de l'app") }
+            OutlinedButton(onClick = { open(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS) }) { Text("Localisation") }
+            OutlinedButton(onClick = onQuit, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Quitter proprement") }
+        }
+        Text("Quitter proprement : arrête les relevés, restaure les réglages changés, ferme l'app.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+    }
+}
+
+private fun open(ctx: Context, action: String) {
+    try { ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
 }
 
 private fun requestIgnoreBatteryOptimizations(ctx: Context) {

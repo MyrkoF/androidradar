@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "ch.lab77.radar"
-        minSdk = 26
-        targetSdk = 34
-        versionCode = 5
-        versionName = "0.2.0"
+        minSdk = 33
+        targetSdk = 35
+        versionCode = 6
+        versionName = "0.2.1"
     }
 
     signingConfigs {

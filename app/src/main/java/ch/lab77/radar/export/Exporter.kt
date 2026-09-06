@@ -7,6 +7,8 @@ import androidx.core.content.FileProvider
 import ch.lab77.radar.data.Category
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.Persistence
+import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,17 +43,17 @@ object Exporter {
 
     fun wigleCsv(devices: Collection<Device>): String {
         val sb = StringBuilder()
-        sb.append("WigleWifi-1.4,appRelease=radar-0.1,model=${Build.MODEL},release=${Build.VERSION.RELEASE},")
+        sb.append("WigleWifi-1.4,appRelease=radar-0.2,model=${Build.MODEL},release=${Build.VERSION.RELEASE},")
         sb.append("device=${Build.DEVICE},display=${Build.DISPLAY},board=${Build.BOARD},brand=${Build.BRAND}\n")
         sb.append("MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n")
         for (d in devices.sortedBy { it.firstSeen }) {
-            val auth = if (d.kind == Kind.WIFI) d.capabilities else "Misc [BLE]"
+            val auth = when (d.kind) { Kind.WIFI -> d.capabilities; Kind.BLE -> "Misc [BLE]"; Kind.CELL -> d.capabilities }
             sb.append(csv(d.id)).append(',').append(csv(d.name)).append(',').append(csv(auth)).append(',')
             sb.append(stamp.format(Date(d.firstSeen))).append(',')
             sb.append(d.channel).append(',').append(d.bestRssi).append(',')
             sb.append(d.lat ?: 0.0).append(',').append(d.lon ?: 0.0).append(',')
             sb.append(d.altitude ?: 0.0).append(',').append(d.accuracy ?: 0f).append(',')
-            sb.append(if (d.kind == Kind.WIFI) "WIFI" else "BLE").append('\n')
+            sb.append(when (d.kind) { Kind.WIFI -> "WIFI"; Kind.BLE -> "BLE"; Kind.CELL -> d.band }).append('\n')
         }
         return sb.toString()
     }
@@ -63,7 +65,7 @@ object Exporter {
 
     fun json(devices: Collection<Device>, st: ScanStatus): String {
         val root = JSONObject()
-        root.put("tool", "Radar 0.1")
+        root.put("tool", "Radar 0.2")
         root.put("exported", stamp.format(Date()))
         root.put("session_start", stamp.format(Date(st.sessionStart)))
         root.put("device", "${Build.MANUFACTURER} ${Build.MODEL} / Android ${Build.VERSION.RELEASE}")
@@ -79,6 +81,15 @@ object Exporter {
                 put("seen_count", d.seenCount)
                 put("lat", d.lat ?: JSONObject.NULL); put("lon", d.lon ?: JSONObject.NULL)
                 put("altitude", d.altitude ?: JSONObject.NULL); put("accuracy", d.accuracy ?: JSONObject.NULL)
+                if (d.wifiStandard.isNotBlank()) put("wifi_standard", d.wifiStandard)
+                if (d.rttCapable) { put("rtt_capable", true); put("rtt_m", d.rttM ?: JSONObject.NULL); put("rtt_std_m", d.rttStdM ?: JSONObject.NULL) }
+                ScanRepository.estimates.value[d.id]?.let { e ->
+                    put("estimate", JSONObject().apply {
+                        put("lat", e.lat ?: JSONObject.NULL); put("lon", e.lon ?: JSONObject.NULL); put("radius_m", e.radius)
+                        put("observations", e.n); put("persistence", e.persistence.name); put("rtt_fix", e.rttFix)
+                        put("alt_rel_m", e.altM ?: JSONObject.NULL)
+                    })
+                }
             })
         }
         root.put("devices", arr)
@@ -91,6 +102,8 @@ object Exporter {
         val now = System.currentTimeMillis()
         val wifi = devices.filter { it.kind == Kind.WIFI }
         val ble = devices.filter { it.kind == Kind.BLE }
+        val cells = devices.filter { it.kind == Kind.CELL }
+        val estimates = ScanRepository.estimates.value
         val durMin = ((now - st.sessionStart) / 60_000).coerceAtLeast(1)
         val lats = devices.mapNotNull { it.lat }; val lons = devices.mapNotNull { it.lon }
         val tz = TimeZone.getDefault().id
@@ -114,8 +127,17 @@ object Exporter {
         sb.appendLine("## Volumes")
         sb.appendLine("- Wi-Fi : ${wifi.size} points d'accès (${wifi.count { it.name.isBlank() }} SSID cachés, ${wifi.count { it.category == Category.RANDOMIZED }} MAC locales/randomisées)")
         sb.appendLine("- BLE : ${ble.size} émetteurs (${ble.count { it.category == Category.RANDOMIZED }} adresses aléatoires)")
+        sb.appendLine("- Cellules mobiles : ${cells.size}")
         sb.appendLine("- Actifs dans les 2 dernières minutes : ${devices.count { it.ageMs < 120_000 }}")
+        sb.appendLine("- Persistance : ${estimates.count { it.value.persistence == Persistence.STATIONARY }} stationnaires, ${estimates.count { it.value.persistence == Persistence.PASSING }} passants, ${estimates.count { it.value.persistence == Persistence.WITH_ME }} avec l'opérateur, ${estimates.count { it.value.rttFix }} trilatérés (RTT)")
         sb.appendLine()
+        if (cells.isNotEmpty()) {
+            sb.appendLine("## Couverture cellulaire")
+            cells.sortedByDescending { it.bestRssi }.forEach { d ->
+                sb.appendLine("- ${d.bestRssi} dBm · ${d.name} · ${d.id} · ${d.capabilities}" + (if (d.lat != null) " · @ ${"%.5f".format(d.lat)},${"%.5f".format(d.lon)}" else ""))
+            }
+            sb.appendLine()
+        }
         sb.appendLine("## Occupation spectrale Wi-Fi")
         for (band in listOf("2.4 GHz", "5 GHz", "6 GHz")) {
             val inBand = wifi.filter { it.band == band }

@@ -13,7 +13,7 @@ import org.maplibre.turf.TurfTransformation
 
 /** Construit les couches GeoJSON de la carte à partir de l'état du dépôt. Pur, sans référence à l'UI. */
 object GeoJson {
-    fun kindHex(k: Kind) = if (k == Kind.WIFI) "#3DDC97" else "#5CB8FF"
+    fun kindHex(k: Kind) = when (k) { Kind.WIFI -> "#3DDC97"; Kind.BLE -> "#5CB8FF"; Kind.CELL -> "#FF8A50" }
 
     /** Appareils à poser sur la carte : ceux qui ont une position estimée, filtrés par persistance (cahier §3 bis). */
     fun placed(devices: Map<String, Device>, estimates: Map<String, Estimate>, showAll: Boolean, accepts: (Device) -> Boolean): List<Pair<Device, Estimate>> =
@@ -30,7 +30,7 @@ object GeoJson {
             Feature.fromGeometry(Point.fromLngLat(e.lon!!, e.lat!!)).apply {
                 addStringProperty("id", d.id)
                 addStringProperty("color", kindHex(d.kind))
-                addStringProperty("stroke", if (d.category.isPriority) "#FF5C5C" else "#FFFFFF")
+                addStringProperty("stroke", when { d.category.isPriority -> "#FF5C5C"; e.rttFix -> "#FFB74D"; else -> "#FFFFFF" })
                 addNumberProperty("r", when { d.id == selected -> 11f; d.category.isPriority -> 9f; else -> 6f })
                 addNumberProperty("op", if (e.persistence == Persistence.UNKNOWN) 0.55f else 1f)
                 addStringProperty("label", if (d.category.isPriority || d.id == selected) d.name.ifBlank { d.vendor } else "")
@@ -47,7 +47,20 @@ object GeoJson {
         if (points.size < 2) FeatureCollection.fromFeatures(emptyList())
         else FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it[1], it[0]) }))))
 
-    fun me(lat: Double?, lon: Double?): FeatureCollection =
-        if (lat == null || lon == null) FeatureCollection.fromFeatures(emptyList())
-        else FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(Point.fromLngLat(lon, lat))))
+    /** Ma position + cône de cap (±30°, 20 m) quand la boussole est disponible. */
+    fun me(lat: Double?, lon: Double?, heading: Float?): FeatureCollection {
+        if (lat == null || lon == null) return FeatureCollection.fromFeatures(emptyList())
+        val fs = mutableListOf(Feature.fromGeometry(Point.fromLngLat(lon, lat)))
+        if (heading != null) {
+            val kx = 111_320.0 * Math.cos(Math.toRadians(lat)); val ky = 111_320.0
+            val ring = mutableListOf(Point.fromLngLat(lon, lat))
+            for (a in -30..30 step 10) {
+                val rad = Math.toRadians(heading + a.toDouble())
+                ring += Point.fromLngLat(lon + 20 * Math.sin(rad) / kx, lat + 20 * Math.cos(rad) / ky)
+            }
+            ring += Point.fromLngLat(lon, lat)
+            fs += Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(listOf(ring)))
+        }
+        return FeatureCollection.fromFeatures(fs)
+    }
 }

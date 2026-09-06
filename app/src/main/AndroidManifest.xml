@@ -11,10 +11,11 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
 
-    <!-- Bluetooth -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- Bluetooth (Android 12+ : une seule permission de scan) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+    <!-- Podomètre (estime quand le GPS décroche, cahier §4 ter) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!-- Service de premier plan (scan continu écran éteint) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -24,6 +25,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Demander à sortir de l'optimisation batterie (surcouches vivo/Xiaomi tuent sinon le service) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Limitation du scan Wi-Fi (réglage global) : sans effet tant que non accordée par ADB une fois
+         (adb shell pm grant ch.lab77.radar android.permission.WRITE_SECURE_SETTINGS), cf. issue #9 -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <!-- Réseau : uniquement pour télécharger les fonds de carte (package map/, cahier §8).
          Scanners, base et exports n'y touchent jamais ; l'écran Session affiche l'état réseau. -->
@@ -33,6 +37,11 @@
     <uses-feature android:name="android.hardware.wifi" android:required="true" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.rtt" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.barometer" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:allowBackup="false"

@@ -10,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -34,6 +33,8 @@ class ScanService : Service() {
         const val ACTION_WIFI_OFF = "ch.lab77.radar.WIFI_OFF"
         const val ACTION_BLE_ON = "ch.lab77.radar.BLE_ON"
         const val ACTION_BLE_OFF = "ch.lab77.radar.BLE_OFF"
+        const val ACTION_CELL_ON = "ch.lab77.radar.CELL_ON"
+        const val ACTION_CELL_OFF = "ch.lab77.radar.CELL_OFF"
         const val ACTION_STOP = "ch.lab77.radar.STOP"
         const val ACTION_RESUME = "ch.lab77.radar.RESUME"
         private const val CHANNEL = "scan"
@@ -51,10 +52,14 @@ class ScanService : Service() {
 
     private lateinit var wifi: WifiScanner
     private lateinit var ble: BleScanner
+    private lateinit var cell: CellScanner
     private lateinit var gps: GpsTracker
+    private lateinit var sensors: PhoneSensors
+    private lateinit var rtt: RttRanger
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiOn = false
     private var bleOn = false
+    private var cellOn = false
     private val handler = Handler(Looper.getMainLooper())
     private var wifiGapReported = false
     private var bleGapReported = false
@@ -72,6 +77,7 @@ class ScanService : Service() {
                     wifiGapReported = true
                 } else if (gap <= WIFI_GAP_MS) wifiGapReported = false
             }
+            if (cellOn && !cell.isRunning) { ScanRepository.logLine("!! Cell : relevé arrêté, relance"); cell.start() }
             if (bleOn) {
                 if (!ble.isRunning) { ScanRepository.logLine("!! BLE : scanner arrêté, relance"); ble.start() }
                 val last = ScanRepository.lastBleResultAt
@@ -92,9 +98,13 @@ class ScanService : Service() {
     override fun onCreate() {
         super.onCreate()
         ScanRepository.init(this)
-        wifi = WifiScanner(this)
+        rtt = RttRanger(this)
+        wifi = WifiScanner(this, rtt)
         ble = BleScanner(this)
+        cell = CellScanner(this)
         gps = GpsTracker(this)
+        sensors = PhoneSensors(this)
+        ScanRepository.setStatus { it.copy(sensors = sensors.availability(if (rtt.supported) rtt.available else false)) }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "radar:scan")
     }
@@ -106,30 +116,37 @@ class ScanService : Service() {
             ACTION_WIFI_OFF -> { wifi.stop(); wifiOn = false }
             ACTION_BLE_ON -> { if (!goForeground()) return START_NOT_STICKY; if (ble.start()) bleOn = true }
             ACTION_BLE_OFF -> { ble.stop(); bleOn = false }
-            ACTION_STOP -> { wifiOn = false; bleOn = false }
+            ACTION_CELL_ON -> { if (!goForeground()) return START_NOT_STICKY; cellOn = cell.start() }
+            ACTION_CELL_OFF -> { cell.stop(); cellOn = false }
+            ACTION_STOP -> { wifiOn = false; bleOn = false; cellOn = false }
             else -> {
                 // null = relance par le système après kill ; RESUME = alarme après retrait des récents
                 val wantWifi = prefs.getBoolean("wifi", false)
                 val wantBle = prefs.getBoolean("ble", false)
-                if (wantWifi || wantBle) {
-                    ScanRepository.logLine("!! Service relancé (${if (intent == null) "système" else "alarme"}) — reprise Wi-Fi=$wantWifi BLE=$wantBle")
+                val wantCell = prefs.getBoolean("cell", false)
+                if (wantWifi || wantBle || wantCell) {
+                    ScanRepository.logLine("!! Service relancé (${if (intent == null) "système" else "alarme"}) — reprise Wi-Fi=$wantWifi BLE=$wantBle Cell=$wantCell")
                     if (!goForeground()) return START_NOT_STICKY
                     if (wantWifi) { wifi.start(); wifiOn = true }
                     if (wantBle) bleOn = ble.start()
+                    if (wantCell) cellOn = cell.start()
                 }
             }
         }
-        prefs.edit().putBoolean("wifi", wifiOn).putBoolean("ble", bleOn).apply()
+        prefs.edit().putBoolean("wifi", wifiOn).putBoolean("ble", bleOn).putBoolean("cell", cellOn).apply()
 
-        if (wifiOn || bleOn) {
+        if (wifiOn || bleOn || cellOn) {
+            SystemTweaks.onScanStart(this)
             gps.start()
+            sensors.start()
             if (wakeLock?.isHeld == false) wakeLock?.acquire(6 * 60 * 60 * 1000L)
             updateNotification()
             handler.removeCallbacks(watchdog)
             handler.postDelayed(watchdog, WATCHDOG_MS)
         } else {
             handler.removeCallbacks(watchdog)
-            wifi.stop(); ble.stop(); gps.stop()
+            wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop()
+            SystemTweaks.restore(this)
             if (wakeLock?.isHeld == true) wakeLock?.release()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -139,7 +156,7 @@ class ScanService : Service() {
 
     /** Tâche retirée des récents : certaines surcouches tuent alors le process. On programme une relance. */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (wifiOn || bleOn) {
+        if (wifiOn || bleOn || cellOn) {
             val pi = PendingIntent.getForegroundService(
                 this, 2, Intent(this, ScanService::class.java).setAction(ACTION_RESUME),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -153,7 +170,8 @@ class ScanService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(watchdog)
-        wifi.stop(); ble.stop(); gps.stop()
+        wifi.stop(); ble.stop(); cell.stop(); gps.stop(); sensors.stop()
+        SystemTweaks.restore(this)
         if (wakeLock?.isHeld == true) wakeLock?.release()
         super.onDestroy()
     }
@@ -168,14 +186,11 @@ class ScanService : Service() {
         }
         val n = buildNotification()
         return try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIF_ID, n,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-            } else startForeground(NOTIF_ID, n)
+            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             true
         } catch (e: Exception) {
             ScanRepository.logLine("!! Premier plan refusé par Android (${e.javaClass.simpleName}) — rouvrir l'app et relancer")
-            wifiOn = false; bleOn = false
+            wifiOn = false; bleOn = false; cellOn = false
             stopSelf()
             false
         }
@@ -195,7 +210,7 @@ class ScanService : Service() {
             this, 1, Intent(this, ScanService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val parts = buildList { if (wifiOn) add("Wi-Fi"); if (bleOn) add("BLE") }
+        val parts = buildList { if (wifiOn) add("Wi-Fi"); if (bleOn) add("BLE"); if (cellOn) add("Cell") }
         val text = "Relevé actif : ${parts.joinToString(" + ").ifBlank { "—" }} · ${ScanRepository.devices.value.size} appareils"
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_fg)

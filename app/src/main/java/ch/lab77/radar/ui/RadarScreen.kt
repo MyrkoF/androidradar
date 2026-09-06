@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ScanStatus
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -57,7 +58,7 @@ private const val SPAN_MAX = 70f
 private const val CURVE = 1.4
 
 @Composable
-fun RadarScreen(devices: Map<String, Device>) {
+fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
     val transition = rememberInfiniteTransition(label = "sweep")
     val sweep by transition.animateFloat(
         0f, 360f, infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "angle"
@@ -129,7 +130,7 @@ fun RadarScreen(devices: Map<String, Device>) {
         }
         Column(Modifier.fillMaxWidth().background(Palette.surface).padding(horizontal = 10.dp, vertical = 6.dp).heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Legend("● Wi-Fi", Palette.green); Legend("● BLE", Palette.blue); Legend("◎ à surveiller", Palette.red); Legend("estompé = vu > 30 s", Palette.muted)
+                Legend("● Wi-Fi", Palette.green); Legend("● BLE", Palette.blue); Legend("● Cell", Palette.orange); Legend("◎ à surveiller", Palette.red); Legend("estompé = vu > 30 s", Palette.muted)
             }
             Text(
                 "rayon = signal (≈ distance, ordre de grandeur) · angle arbitraire, stable par adresse · pincer = zoom · tap = détail",
@@ -145,6 +146,7 @@ fun RadarScreen(devices: Map<String, Device>) {
                     OutlinedButton(onClick = { selected = null }) { Text("✕") }
                 }
                 DeviceDetail(sel)
+                WalkGuide(sel, st)
             }
         }
     }

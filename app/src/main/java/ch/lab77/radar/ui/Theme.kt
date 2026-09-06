@@ -19,6 +19,7 @@ object Palette {
     val blue = Color(0xFF5CB8FF)
     val violet = Color(0xFFB39DFF)
     val grid = Color(0xFF1F3A3A)
+    val orange = Color(0xFFFF8A50)
 }
 
 fun categoryColor(c: Category): Color = when (c) {
@@ -29,11 +30,12 @@ fun categoryColor(c: Category): Color = when (c) {
     Category.INDUSTRIAL -> Palette.violet
     Category.ROUTER_AP -> Palette.blue
     Category.CONSUMER -> Palette.green
+    Category.CELL_TOWER -> Palette.orange
     Category.RANDOMIZED -> Palette.muted
     Category.UNKNOWN -> Palette.text
 }
 
-fun kindColor(k: Kind): Color = if (k == Kind.WIFI) Palette.green else Palette.blue
+fun kindColor(k: Kind): Color = when (k) { Kind.WIFI -> Palette.green; Kind.BLE -> Palette.blue; Kind.CELL -> Palette.orange }
 
 private val scheme = darkColorScheme(
     primary = Palette.green,

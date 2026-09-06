@@ -47,6 +47,11 @@ object ScanRepository {
     private val io = Executors.newSingleThreadExecutor()
     private var tone: ToneGenerator? = null
 
+    /** Échantillon (temps, signal, cap) pour le guide de marche — masquage corporel (cahier §4 ter). */
+    data class Sample(val t: Long, val rssi: Int, val heading: Float?)
+    private val samples = HashMap<String, ArrayDeque<Sample>>()
+    private val rtt = HashMap<String, Pair<Float, Float>>()      // id → (distance m, écart-type m)
+
     // Accédés uniquement depuis le thread `io`
     private val obsById = HashMap<String, ArrayDeque<Obs>>()
     private val lastEstimateWrite = HashMap<String, Long>()
@@ -68,10 +73,11 @@ object ScanRepository {
 
     fun setStatus(f: (ScanStatus) -> ScanStatus) = _status.update(f)
 
-    fun setLocation(loc: Location) {
+    /** Position du téléphone. `estimated` = à l'estime (pas + cap), jamais confondue avec un fix GPS. */
+    fun setLocation(loc: Location, estimated: Boolean = false) {
         location = loc
         _status.update {
-            it.copy(gpsFix = true, lat = loc.latitude, lon = loc.longitude,
+            it.copy(gpsFix = !estimated, deadReckoning = estimated, lat = loc.latitude, lon = loc.longitude,
                 altitude = if (loc.hasAltitude()) loc.altitude else null,
                 accuracy = if (loc.hasAccuracy()) loc.accuracy else null)
         }
@@ -82,32 +88,65 @@ object ScanRepository {
     }
 
     fun setAlerts(on: Boolean) = _status.update { it.copy(alertsOn = on) }
+    fun setHeading(deg: Float) = _status.update { it.copy(heading = deg) }
+    fun setBaro(hpa: Float, altRelM: Float) = _status.update { it.copy(pressureHpa = hpa, baroAltM = altRelM) }
+
+    /** Distance mesurée Wi-Fi RTT vers un AP (thread principal) → portée dans l'appareil et les observations. */
+    fun setRanging(id: String, distM: Float, stdM: Float) {
+        io.execute {
+            rtt[id] = distM to stdM
+            _devices.value[id]?.let { d -> _devices.update { it + (id to d.copy(rttM = distM, rttStdM = stdM, rttCapable = true)) } }
+            logLine("RTT $id : ${"%.1f".format(distM)} m ±${"%.1f".format(stdM)}")
+        }
+    }
+
+    fun markRttCapable(ids: List<String>) {
+        io.execute {
+            var m = _devices.value; var changed = false
+            for (id in ids) m[id]?.takeIf { !it.rttCapable }?.let { m = m + (id to it.copy(rttCapable = true)); changed = true }
+            if (changed) _devices.value = m
+        }
+    }
+
+    /** Derniers échantillons (60 s) d'un appareil, pour le guide de marche. */
+    fun samplesOf(id: String): List<Sample> = synchronized(samples) { samples[id]?.toList() ?: emptyList() }
 
     fun logLine(s: String) { _log.tryEmit(s) }
 
     /** Point d'entrée unique des scanners. Thread-safe par sérialisation sur `io`. */
-    fun observe(kind: Kind, rawId: String, name: String?, rssi: Int, frequency: Int, capabilities: String, bleCompanyId: Int? = null) {
-        if (kind == Kind.WIFI) lastWifiResultAt = System.currentTimeMillis() else lastBleResultAt = System.currentTimeMillis()
+    fun observe(
+        kind: Kind, rawId: String, name: String?, rssi: Int, frequency: Int, capabilities: String,
+        bleCompanyId: Int? = null, vendorOverride: String? = null, wifiStandard: String = "",
+    ) {
+        when (kind) { Kind.WIFI -> lastWifiResultAt = System.currentTimeMillis(); Kind.BLE -> lastBleResultAt = System.currentTimeMillis(); Kind.CELL -> {} }
+        val headingNow = _status.value.heading
         io.execute {
             val id = rawId.uppercase()
             val now = System.currentTimeMillis()
+            synchronized(samples) {
+                val q = samples.getOrPut(id) { ArrayDeque() }
+                q.addLast(Sample(now, rssi, headingNow))
+                while (q.size > 150 || now - q.first().t > 60_000) q.removeFirst()
+            }
             val loc = location?.takeIf { now - it.time < 60_000 }   // jamais de position sans fix de moins de 60 s
             val prev = _devices.value[id]
 
             val vendor: String; val vendorLong: String
-            if (prev != null) { vendor = prev.vendor; vendorLong = prev.vendorLong } else {
+            if (prev != null) { vendor = prev.vendor; vendorLong = prev.vendorLong }
+            else if (vendorOverride != null) { vendor = vendorOverride; vendorLong = vendorOverride }
+            else {
                 val v = Oui.lookup(id)
                 val company = bleCompanyId?.let { Oui.bleCompany(it) }
                 vendor = v?.let { Oui.displayName(it.long, it.short) } ?: company ?: ""
                 vendorLong = v?.long ?: company ?: ""
             }
-            val category = prev?.category ?: Classifier.classify(vendorLong, kind, id)
+            val category = prev?.category ?: if (kind == Kind.CELL) Category.CELL_TOWER else Classifier.classify(vendorLong, kind, id)
             val displayName = name?.takeIf { it.isNotBlank() } ?: prev?.name ?: ""
 
             val d = if (prev == null) Device(
                 kind, id, displayName, rssi, rssi, frequency, capabilities, vendor, vendorLong, category,
                 now, now, 1, loc?.latitude, loc?.longitude, loc?.takeIf { it.hasAltitude() }?.altitude,
-                loc?.takeIf { it.hasAccuracy() }?.accuracy
+                loc?.takeIf { it.hasAccuracy() }?.accuracy, rtt[id]?.first, rtt[id]?.second, rtt.containsKey(id), wifiStandard
             ) else prev.copy(
                 name = displayName, rssi = rssi, bestRssi = maxOf(prev.bestRssi, rssi),
                 frequency = if (frequency != 0) frequency else prev.frequency,
@@ -116,6 +155,7 @@ object ScanRepository {
                 lat = loc?.latitude ?: prev.lat, lon = loc?.longitude ?: prev.lon,
                 altitude = loc?.takeIf { it.hasAltitude() }?.altitude ?: prev.altitude,
                 accuracy = loc?.takeIf { it.hasAccuracy() }?.accuracy ?: prev.accuracy,
+                wifiStandard = wifiStandard.ifBlank { prev.wifiStandard },
             )
 
             _devices.update { it + (id to d) }
@@ -125,11 +165,12 @@ object ScanRepository {
             // Estimation de position : une observation par relevé géolocalisé
             if (loc != null) {
                 val list = obsById.getOrPut(id) { ArrayDeque() }
-                list.addLast(Obs(now, loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 30f, rssi))
+                val fresh = rtt[id]?.first   // distance mesurée récente (RTT toutes les ~12 s)
+                list.addLast(Obs(now, loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 30f, rssi, _status.value.baroAltM, fresh))
                 while (list.size > Estimator.MAX_OBS) list.removeFirst()
             }
             val obs = obsById[id] ?: emptyList<Obs>()
-            val est = Estimator.estimate(obs.toList(), kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs.toList()))
+            val est = Estimator.estimate(obs.toList(), kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs.toList(), kind))
             _estimates.update { it + (id to est) }
             if (est.lat != null && now - (lastEstimateWrite[id] ?: 0L) > 10_000) {
                 lastEstimateWrite[id] = now
@@ -153,7 +194,7 @@ object ScanRepository {
             var next = cur
             for ((id, d) in devs) {
                 val obs = obsById[id]?.toList() ?: emptyList()
-                val p = Estimator.persistence(d.firstSeen, d.lastSeen, now, obs)
+                val p = Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, d.kind)
                 val e = cur[id]
                 if (e == null) next = next + (id to Estimator.estimate(obs, d.kind, p))
                 else if (e.persistence != p) next = next + (id to e.copy(persistence = p))
@@ -172,7 +213,8 @@ object ScanRepository {
     fun clearSession() {
         io.execute {
             try { db?.endSession(_status.value.sessionId, System.currentTimeMillis()) } catch (_: Exception) {}
-            obsById.clear(); lastEstimateWrite.clear()
+            obsById.clear(); lastEstimateWrite.clear(); rtt.clear()
+            synchronized(samples) { samples.clear() }
             _devices.value = emptyMap()
             _estimates.value = emptyMap()
             _trace.value = emptyList()

@@ -6,18 +6,17 @@ import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import ch.lab77.radar.data.ScanRepository
 
-/** Position via LocationManager natif (pas de Play Services : fonctionne sur GrapheneOS et sans Google). */
+/** Position via LocationManager natif (pas de Play Services). Un fix réel remplace toujours l'estime. */
 class GpsTracker(ctx: Context) {
     private val appCtx = ctx.applicationContext
     private val lm = appCtx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private var running = false
+
+    private val listener = LocationListener { location -> ScanRepository.setLocation(location) }
 
     /** Satellites vus / utilisés : affiché dans la barre d'état, utile pour juger la qualité du fix. */
     private val gnss = object : GnssStatus.Callback() {
@@ -28,19 +27,11 @@ class GpsTracker(ctx: Context) {
         }
     }
 
-    private val listener = object : LocationListener {
-        override fun onLocationChanged(location: Location) { ScanRepository.setLocation(location) }
-        @Deprecated("Deprecated in Java") override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-        override fun onProviderEnabled(provider: String) {}
-        override fun onProviderDisabled(provider: String) {}
-    }
-
     @SuppressLint("MissingPermission")
     fun start() {
         if (running) return
         running = true
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-        for (p in providers) {
+        for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
             try {
                 if (lm.isProviderEnabled(p)) {
                     lm.getLastKnownLocation(p)?.let { ScanRepository.setLocation(it) }
@@ -48,10 +39,7 @@ class GpsTracker(ctx: Context) {
                 }
             } catch (_: Exception) {}
         }
-        try {
-            if (Build.VERSION.SDK_INT >= 30) lm.registerGnssStatusCallback(ContextCompat.getMainExecutor(appCtx), gnss)
-            else @Suppress("DEPRECATION") lm.registerGnssStatusCallback(gnss, Handler(Looper.getMainLooper()))
-        } catch (_: Exception) {}
+        try { lm.registerGnssStatusCallback(ContextCompat.getMainExecutor(appCtx), gnss) } catch (_: Exception) {}
         ScanRepository.logLine("GPS : suivi démarré")
     }
 

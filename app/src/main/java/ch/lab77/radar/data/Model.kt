@@ -1,6 +1,6 @@
 package ch.lab77.radar.data
 
-enum class Kind { WIFI, BLE }
+enum class Kind { WIFI, BLE, CELL }
 
 /** Catégorie déduite du fabricant (OUI) et des métadonnées publiques. */
 enum class Category(val label: String, val priority: Int) {
@@ -11,6 +11,7 @@ enum class Category(val label: String, val priority: Int) {
     FLEET("Flotte / télématique", 4),
     ROUTER_AP("Routeur Wi-Fi / box", 2),
     CONSUMER("Grand public", 1),
+    CELL_TOWER("Cellule mobile", 0),
     RANDOMIZED("MAC aléatoire", 0),
     UNKNOWN("Inconnu", 0);
 
@@ -24,7 +25,11 @@ enum class Persistence(val label: String) {
 }
 
 /** Position estimée d'un émetteur : centroïde pondéré + rayon d'incertitude calculé (cahier §3). lat/lon null = jamais géolocalisé. */
-data class Estimate(val lat: Double?, val lon: Double?, val radius: Float, val n: Int, val persistence: Persistence)
+data class Estimate(
+    val lat: Double?, val lon: Double?, val radius: Float, val n: Int, val persistence: Persistence,
+    val altM: Float? = null,        // altitude barométrique relative au départ de session (étage probable)
+    val rttFix: Boolean = false,    // position obtenue par trilatération de distances mesurées (Wi-Fi RTT)
+)
 
 data class Device(
     val kind: Kind,
@@ -44,10 +49,15 @@ data class Device(
     val lon: Double?,
     val altitude: Double?,
     val accuracy: Float?,
+    val rttM: Float? = null,            // distance mesurée Wi-Fi RTT (802.11mc/az), null si non mesurée
+    val rttStdM: Float? = null,
+    val rttCapable: Boolean = false,
+    val wifiStandard: String = "",      // Wi-Fi 4/5/6/7 d'après ScanResult.wifiStandard
 ) {
-    val channel: Int get() = freqToChannel(frequency)
+    val channel: Int get() = if (kind == Kind.WIFI) freqToChannel(frequency) else 0
     val band: String get() = when {
-        frequency == 0 -> "BLE"
+        kind == Kind.BLE -> "BLE"
+        kind == Kind.CELL -> capabilities.substringAfter("tech=", "cell").substringBefore(' ')
         frequency < 3000 -> "2.4 GHz"
         frequency < 5900 -> "5 GHz"
         else -> "6 GHz"
@@ -84,6 +94,13 @@ data class ScanStatus(
     val accuracy: Float? = null,
     val satsVisible: Int = 0,       // satellites GNSS vus / utilisés dans le fix
     val satsUsed: Int = 0,
+    val cellOn: Boolean = false,
+    val heading: Float? = null,     // cap vrai en degrés (boussole), null si pas de capteur
+    val pressureHpa: Float? = null,
+    val baroAltM: Float? = null,    // altitude barométrique relative au départ de session
+    val deadReckoning: Boolean = false,   // position actuelle = estime (pas + cap), pas un fix GPS
+    val steps: Int = 0,
+    val sensors: String = "",       // disponibilité des capteurs, pour l'écran Session
     val sessionStart: Long = 0L,
     val sessionId: Long = 0L,
     val alertsOn: Boolean = true,

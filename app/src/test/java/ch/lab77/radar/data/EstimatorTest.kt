@@ -33,6 +33,30 @@ class EstimatorTest {
         assertEquals(1000.0, Estimator.distanceM(lat0, lon0, lat0 + 1000.0 / 111_320.0, lon0), 2.0)
     }
 
+    @Test fun `trilateration sur distances mesurees`() {
+        // cible à (0, 0) local ; observateurs à (-30 E), (+30 N), (+40 E) avec distances exactes
+        val obs = listOf(
+            Obs(0, lat0, lon0 - 30.0 / (111_320.0 * Math.cos(Math.toRadians(lat0))), 5f, -60, rttM = 30f),
+            Obs(1, lat0 + 30.0 / 111_320.0, lon0, 5f, -60, rttM = 30f),
+            Obs(2, lat0, lon0 + 40.0 / (111_320.0 * Math.cos(Math.toRadians(lat0))), 5f, -60, rttM = 40f),
+        )
+        val e = Estimator.estimate(obs, Kind.WIFI, Persistence.UNKNOWN)
+        assertTrue(e.rttFix)
+        assertEquals(0.0, Estimator.distanceM(lat0, lon0, e.lat!!, e.lon!!), 1.0)
+        assertTrue("rayon ${e.radius}", e.radius < 5f)
+        // deux mesures seulement : pas de trilatération
+        assertTrue(!Estimator.estimate(obs.take(2), Kind.WIFI, Persistence.UNKNOWN).rttFix)
+    }
+
+    @Test fun `barometre et estime`() {
+        assertEquals(0f, Estimator.baroAltitude(1013.25f, 1013.25f), 0.01f)
+        assertTrue(Estimator.baroAltitude(1012.0f, 1013.25f) in 9f..12f)     // ~1 hPa ≈ 8–9 m… 1,25 hPa ≈ 10 m
+        val p = Estimator.advance(lat0, lon0, 90f, 100.0)
+        assertEquals(100.0, Estimator.distanceM(lat0, lon0, p[0], p[1]), 0.5)
+        assertTrue(p[1] > lon0)
+        assertEquals(Persistence.STATIONARY, Estimator.persistence(0, 0, 0, emptyList(), Kind.CELL))
+    }
+
     @Test fun `persistance`() {
         val m = 60_000L
         // vu 30 s puis disparu depuis 2 min → passant

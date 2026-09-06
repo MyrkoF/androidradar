@@ -1,0 +1,6 @@
+- Android 13+ requis (plus de rétrocompatibilité : Wi-Fi 6E/7, RTT, cellules 5G)
+- Boussole : cap dans la barre d'état, carte orientée « Cap », cône de direction ; guide de marche (approche / éloigne, rose des caps par masquage corporel)
+- Relevé cellulaire (puce « Cell ») : cellules LTE / 5G / 3G / 2G avec RSRP, sur la carte et dans les exports
+- Wi-Fi RTT : distance mesurée vers les AP compatibles, trilatération de la position
+- Baromètre : altitude relative, étage probable de l'émetteur ; estime au pas quand le GPS décroche
+- Réglages : état de la limitation du scan Wi-Fi, désactivation automatique pendant les relevés (après autorisation ADB), raccourcis système, « Quitter proprement »

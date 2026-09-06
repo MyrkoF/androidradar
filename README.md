@@ -21,7 +21,7 @@ Aucune interception de trafic. Aucune connexion aux appareils observés. Aucune 
 - **Versions** : [Releases](https://github.com/MyrkoF/androidradar/releases) (tags `vX.Y.Z`)
 - **F-Droid** : via le dépôt [IzzyOnDroid](https://apps.izzysoft.de/) — demande d'inclusion en cours (#6)
 
-Sideload (autoriser les sources inconnues). Android 8+ requis. Les APK sont signés avec la clé de release
+Sideload (autoriser les sources inconnues). **Android 13+ requis.** Les APK sont signés avec la clé de release
 du projet (empreinte dans `docs/RELEASE.md`) ; une version antérieure à la 0.1.3 doit être désinstallée avant.
 
 Au premier démarrage, accorder : **localisation précise** (exigée par Android pour tout scan
@@ -45,6 +45,12 @@ l'app affiche `throttle` quand elle est bridée et lit alors le cache système).
   du réseau de l'app.
 - **Session** : exports (partage système → Drive, Signal, fichier…), journal, batterie, réseau, nouvelle session.
 - **⚙ Filtres** (en haut à droite) : types, catégories, disparus — communs aux trois vues.
+- **Cell** : relevé cellulaire passif (LTE / 5G / 3G / 2G, RSRP par position) — couverture du site.
+- **Capteurs** : boussole (carte « Cap », guide de marche par masquage corporel), Wi-Fi RTT (distance
+  mesurée, trilatération), baromètre (étage), estime au pas quand le GPS décroche.
+- **Réglages** (Session) : limitation du scan Wi-Fi lue, et désactivée automatiquement pendant les relevés si
+  `adb shell pm grant ch.lab77.radar android.permission.WRITE_SECURE_SETTINGS` a été fait une fois ;
+  « Quitter proprement » restaure tout.
 
 Le CSV suit le format WiGLE 1.4 : importable sur wigle.net et lisible par les outils du même écosystème.
 La base SQLite locale (`radar.db`, schéma inspiré de WiGLE) accumule toutes les sessions.
