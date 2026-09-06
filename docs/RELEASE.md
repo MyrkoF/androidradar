@@ -13,9 +13,11 @@ Avant la v0.1.3 les APK étaient signés avec une clé *debug* régénérée à 
 désinstaller une version antérieure avant d'installer une version signée.
 
 ## Deux canaux
-- `latest` : recréé à chaque push sur `main`. Lien fixe
+- Un push sur `main` compile et teste (artefact `radar-release-apk`), **sans publier** : l'APK n'est publié
+  que lorsque tout ce qui est en cours est terminé (décision Myrko 2026-09-06).
+- `vX.Y.Z` : tag → release versionnée (notes = `fastlane/metadata/android/fr-FR/changelogs/<versionCode>.txt`)
+  **et** `latest` recréé avec le même APK, lien fixe
   `https://github.com/MyrkoF/androidradar/releases/download/latest/radar-latest.apk`.
-- `vX.Y.Z` : release versionnée créée quand on pousse un tag `vX.Y.Z` ; notes = `fastlane/metadata/android/fr-FR/changelogs/<versionCode>.txt`.
   C'est ce canal que suivent IzzyOnDroid et F-Droid.
 
 ## Publier une version

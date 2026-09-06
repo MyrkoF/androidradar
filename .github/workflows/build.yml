@@ -65,10 +65,10 @@ jobs:
           name: radar-release-apk
           path: ${{ steps.apk.outputs.name }}
 
-      # Sur main : publie l'APK en Release "latest" (lien direct, stable, sans compte GitHub).
-      # Le tag latest est recréé à chaque build. Les tags v* (releases versionnées) ne sont pas touchés.
+      # Un push sur main compile et teste seulement (artefact). L'APK n'est publié que sur un tag vX.Y.Z,
+      # quand tout ce qui était en cours est terminé (décision Myrko 2026-09-06) : "latest" = dernier tag.
       - name: Publish release (latest)
-        if: github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -77,7 +77,7 @@ jobs:
           gh release create latest radar-latest.apk "${{ steps.apk.outputs.name }}" \
             --prerelease \
             --title "Radar v${{ steps.apk.outputs.version }} (${{ steps.apk.outputs.short }})" \
-            --notes "Build automatique de main @ ${{ github.sha }}. Télécharger l'APK, autoriser les sources inconnues, sideload."
+            --notes "Même APK que la release v${{ steps.apk.outputs.version }} — lien fixe. Télécharger, autoriser les sources inconnues, sideload."
 
       # Sur tag vX.Y.Z : release versionnée, celle que suivent F-Droid / IzzyOnDroid.
       - name: Publish versioned release (tag)
