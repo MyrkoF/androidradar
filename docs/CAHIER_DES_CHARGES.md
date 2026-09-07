@@ -43,6 +43,16 @@ En BLE, la majorité des appareils vus sont des personnes en déplacement. La ca
 - Le podomètre arbitre le mouvement du téléphone (§4 ter). Intérieur/extérieur : automatique seulement, pas de bouton.
 - Tout ce que le guide de marche demande sert à repréciser les positions (décision 2026-09-06, #12) : une direction nette (rose ≥ 8 secteurs, contraste ≥ 6 dB) devient une observation de direction ; deux directions depuis deux endroits distincts → triangulation, qui prime sur le barycentre quand elles se croisent proprement. Mode rafale des capteurs pendant le guide.
 
+### 3 quater. Calibrer l'observateur avant de mesurer (décision 2026-09-06 soir, refonte)
+
+Constat : le positionnement des objets ne vaut rien si la position de l'observateur n'est pas fiable, et une observation prise depuis une position fausse pollue les estimations. Décisions :
+- **Porte de calibration** : aucun objet n'est posé tant que la position n'est pas calibrée (radar, liste, alertes restent actifs). Dehors : GPS ≤ 10 m, ≥ 6 satellites, stable 20 s. Dedans : « Je suis ici » avec précision choisie, ou une **ancre** nommée posée à l'avance.
+- **Budget de précision** : intérieur 5 m, extérieur 10 m. La précision se dégrade avec la dérive (pas, boussole) ; au-delà du seuil, les observations de position s'arrêtent (présence seulement) et l'app le dit avec le geste à faire.
+- **Ancres intérieures** : levée « à la manière d'un plan » — ancres proches, tronçons courts, dérive bornée. Usage : carte des objets Wi-Fi/BT d'un logement (domotique). Extérieur : approximations, site survey LoRa, périmètre.
+- **Observations qualifiées** : chaque observation porte la qualité de l'observateur ; seules les bonnes servent au positionnement.
+- **Preuves** : par objet, points de vue de qualité, couverture angulaire, historique du rayon, prochain geste ; bilan de session.
+- Persistance : temps + stabilité du signal ; étendue spatiale seulement sur positions de qualité.
+
 ## 4. Fonctions v0.2 (périmètre fermé)
 
 Carte
