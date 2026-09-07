@@ -122,8 +122,8 @@ fun ArScreen(target: Device?, onClose: () -> Unit) {
                 pointed?.let { Text(it, color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
             }
             Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).background(Palette.surface.copy(alpha = 0.85f)).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (target != null) Button(enabled = ready && st.arTracking.startsWith("suivi"), onClick = { wantHit = true }) { Text("Pointer l'objet") }
-                OutlinedButton(onClick = onClose) { Text("Fermer") }
+                if (target != null) SmallButton(enabled = ready && st.arTracking.startsWith("suivi"), onClick = { wantHit = true }) { Text("Pointer l'objet") }
+                SmallOutlined(onClick = onClose) { Text("Fermer") }
             }
         }
     }

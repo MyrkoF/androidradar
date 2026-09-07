@@ -118,10 +118,17 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) followMe = false
             }
             m.addOnMapLongClickListener { ll -> manual = ll; true }
+            m.setMaxZoomPreference(22.0)
             m.addOnMapClickListener { ll ->
                 val pt: PointF = m.projection.toScreenLocation(ll)
-                val hit = m.queryRenderedFeatures(pt, "devices").firstOrNull()
-                selected = hit?.getStringProperty("id")
+                val r = 24f * ctx.resources.displayMetrics.density
+                val hits = m.queryRenderedFeatures(android.graphics.RectF(pt.x - r, pt.y - r, pt.x + r, pt.y + r), "devices")
+                // le plus proche du doigt
+                selected = hits.minByOrNull { f ->
+                    val g = f.geometry() as? org.maplibre.geojson.Point ?: return@minByOrNull Double.MAX_VALUE
+                    val sp = m.projection.toScreenLocation(LatLng(g.latitude(), g.longitude()))
+                    (sp.x - pt.x) * (sp.x - pt.x) + (sp.y - pt.y) * (sp.y - pt.y).toDouble()
+                }?.getStringProperty("id")
                 true
             }
             m.setStyle(Style.Builder().fromUri(MapConfig.STYLE_URL)) { style ->
@@ -225,8 +232,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             manual?.let { ll ->
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { manual = null },
-                    confirmButton = { androidx.compose.material3.TextButton(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
-                    dismissButton = { androidx.compose.material3.TextButton(onClick = { manual = null }) { Text("Annuler") } },
+                    confirmButton = { androidx.compose.material3.SmallText(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
+                    dismissButton = { androidx.compose.material3.SmallText(onClick = { manual = null }) { Text("Annuler") } },
                     title = { Text("Poser ma position ici ?") },
                     text = { Text("Ancre en intérieur (±3 m) : les pas, la boussole et la caméra repartent de ce point ; un bon fix GPS reprendra la main dehors.") }
                 )
@@ -257,11 +264,11 @@ private fun OfflinePanel(map: MapLibreMap?, maxZoom: Int, onZoom: (Int) -> Unit,
             for (z in listOf(13, 14, 15, 16)) CompactChip(maxZoom == z, { onZoom(z) }, "z$z")
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(enabled = bounds != null && !downloading && !tooBig, onClick = {
+            SmallOutlined(enabled = bounds != null && !downloading && !tooBig, onClick = {
                 val name = "Zone " + SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(Date())
                 OfflineRegions.download(ctx, name, bounds!!, minZoom, maxZoom, ctx.resources.displayMetrics.density)
             }) { Text("Télécharger la vue") }
-            if (downloading) OutlinedButton(onClick = { OfflineRegions.cancel() }) { Text("Annuler") }
+            if (downloading) SmallOutlined(onClick = { OfflineRegions.cancel() }) { Text("Annuler") }
             if (tooBig) Text("trop grand : zoomer ou baisser z", color = Palette.amber, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
         if (progress != null) Text(
@@ -275,7 +282,7 @@ private fun OfflinePanel(map: MapLibreMap?, maxZoom: Int, onZoom: (Int) -> Unit,
         for (r in regions) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${r.name} · ${r.bytes / 1_000_000} Mo" + (if (!r.complete) " (incomplet)" else ""), color = Palette.text,
                 fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { OfflineRegions.delete(ctx, r.id) }) { Text("Suppr.") }
+            SmallOutlined(onClick = { OfflineRegions.delete(ctx, r.id) }) { Text("Suppr.") }
         }
         if (regions.isEmpty()) Text("Aucune zone hors ligne. Sans zone, la carte a besoin du réseau.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     }

@@ -71,17 +71,14 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { center = (center + 10f).coerceAtMost(CENTER_MAX) }, enabled = center < CENTER_MAX) { Text("−") }
-            OutlinedButton(onClick = { center = (center - 10f).coerceAtLeast(CENTER_MIN) }, enabled = center > CENTER_MIN) { Text("+") }
+            SmallOutlined(onClick = { center = (center + 10f).coerceAtMost(CENTER_MAX) }, enabled = center < CENTER_MAX) { Text("−") }
+            SmallOutlined(onClick = { center = (center - 10f).coerceAtLeast(CENTER_MIN) }, enabled = center > CENTER_MIN) { Text("+") }
             Text("fenêtre ${center.toInt()}…${EDGE_DBM.toInt()} dBm · ${visible.size}/${active.size}", color = Palette.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { CameraUse.thumb = !CameraUse.thumb }) { Text("📷") }
+            SmallOutlined(onClick = { CameraUse.thumb = !CameraUse.thumb }) { Text("📷") }
             FilterMenu()
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             val sel = selected?.let { devices[it] }
-            if (sel != null) Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { Monitor(sel, null, st) { selected = null } }
-            if (CameraUse.thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { CameraThumb { if (sel != null) aimOpen = true } }
-            if (aimOpen && sel != null) RangeFinderScreen(sel, st) { aimOpen = false }
             Canvas(
                 Modifier.fillMaxSize()
                     .pointerInput(Unit) {
@@ -132,6 +129,10 @@ fun RadarScreen(devices: Map<String, Device>, st: ScanStatus) {
                 }
                 drawCircle(Palette.green, 3.dp.toPx(), c)
             }
+            // Après le canvas = dessiné par-dessus (le moniteur était sous le disque : invisible, retour n°9)
+            if (sel != null) Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { Monitor(sel, null, st) { selected = null } }
+            if (CameraUse.thumb) Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { CameraThumb { if (sel != null) aimOpen = true } }
+            if (aimOpen && sel != null) RangeFinderScreen(sel, st) { aimOpen = false }
         }
         Column(Modifier.fillMaxWidth().background(Palette.surface).padding(horizontal = 10.dp, vertical = 6.dp).heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

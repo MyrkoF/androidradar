@@ -120,25 +120,25 @@ private fun ExportsPanel(all: Collection<Device>, st: ScanStatus, onStopAll: () 
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Button(onClick = { Exporter.share(ctx, Exporter.fileName("csv"), "text/csv", Exporter.wigleCsv(sel)) },
+        SmallButton(onClick = { Exporter.share(ctx, Exporter.fileName("csv"), "text/csv", Exporter.wigleCsv(sel)) },
             colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Palette.bg)) { Text("CSV") }
-        Button(onClick = { Exporter.share(ctx, Exporter.fileName("geojson"), "application/geo+json", Exporter.geoJson(sel, trace)) },
+        SmallButton(onClick = { Exporter.share(ctx, Exporter.fileName("geojson"), "application/geo+json", Exporter.geoJson(sel, trace)) },
             colors = ButtonDefaults.buttonColors(containerColor = Palette.violet, contentColor = Palette.bg)) { Text("GeoJSON") }
-        Button(onClick = { Exporter.share(ctx, Exporter.fileName("json"), "application/json", Exporter.json(sel, st, clean)) },
+        SmallButton(onClick = { Exporter.share(ctx, Exporter.fileName("json"), "application/json", Exporter.json(sel, st, clean)) },
             colors = ButtonDefaults.buttonColors(containerColor = Palette.blue, contentColor = Palette.bg)) { Text("JSON") }
-        Button(onClick = { Exporter.share(ctx, Exporter.fileName("md"), "text/plain", Exporter.debrief(sel, st, clean)) },
+        SmallButton(onClick = { Exporter.share(ctx, Exporter.fileName("md"), "text/plain", Exporter.debrief(sel, st, clean)) },
             colors = ButtonDefaults.buttonColors(containerColor = Palette.amber, contentColor = Palette.bg)) { Text("Débrief") }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        OutlinedButton(onClick = { Exporter.share(ctx, Exporter.fileName("diag.json"), "application/json", Exporter.diagnostic(ctx, all, st)) }) { Text("Diagnostic") }
-        OutlinedButton(onClick = { confirmNew = true }) { Text("Nouvelle session") }
-        OutlinedButton(onClick = onStopAll, enabled = st.wifiOn || st.bleOn || st.cellOn, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Arrêter les relevés") }
+        SmallOutlined(onClick = { Exporter.share(ctx, Exporter.fileName("diag.json"), "application/json", Exporter.diagnostic(ctx, all, st)) }) { Text("Diagnostic") }
+        SmallOutlined(onClick = { confirmNew = true }) { Text("Nouvelle session") }
+        SmallOutlined(onClick = onStopAll, enabled = st.wifiOn || st.bleOn || st.cellOn, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Arrêter les relevés") }
     }
     Text("Les puces Wi-Fi / BLE / Cell en haut démarrent et arrêtent les mesures. « Nouvelle session » = nouveau lieu ou nouvelle visite.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
     if (confirmNew) AlertDialog(
         onDismissRequest = { confirmNew = false },
-        confirmButton = { TextButton(onClick = { ScanRepository.clearSession(); confirmNew = false }) { Text("Ouvrir une nouvelle session") } },
-        dismissButton = { TextButton(onClick = { confirmNew = false }) { Text("Annuler") } },
+        confirmButton = { SmallText(onClick = { ScanRepository.clearSession(); confirmNew = false }) { Text("Ouvrir une nouvelle session") } },
+        dismissButton = { SmallText(onClick = { confirmNew = false }) { Text("Annuler") } },
         title = { Text("Nouvelle session ?") },
         text = { Text("La session en cours est clôturée en base (ses positions et observations sont conservées, tu pourras la reprendre ou la comparer). L'écran repart à zéro. Les mesures continuent si les puces sont actives. Le journal n'est pas effacé.") }
     )
@@ -160,7 +160,7 @@ private fun SessionsPanel(st: ScanStatus, currentCount: Int) {
 
     Text("Liste blanche : ${known.size} objets connus du lieu (pas d'alerte). « Connu ? » dans le moniteur d'un objet.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        OutlinedButton(onClick = { ScanRepository.markAllKnown() }) { Text("Tout marquer connu ($currentCount)") }
+        SmallOutlined(onClick = { ScanRepository.markAllKnown() }) { Text("Tout marquer connu ($currentCount)") }
     }
     Text(
         if (compareA == null) "Comparer : choisir une première session (« A »), puis la seconde." else "A = « ${compareA!!.name} » — choisir la session à comparer.",
@@ -172,10 +172,10 @@ private fun SessionsPanel(st: ScanStatus, currentCount: Int) {
             Text((if (current) "● " else "") + "${s.name} · ${dateFmt.format(Date(s.start))}" + (s.end?.let { " → ${dateFmt.format(Date(it))}" } ?: " (en cours)") + " · ${s.positioned} positionnés",
                 color = if (current) Palette.green else Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                if (!current) TextButton(onClick = { ScanRepository.resumeSession(s.id) }) { Text("Reprendre") }
-                TextButton(onClick = { rename = s }) { Text("Renommer") }
-                if (!current) TextButton(onClick = { confirmDelete = s }) { Text("Supprimer") }
-                TextButton(onClick = {
+                if (!current) SmallText(onClick = { ScanRepository.resumeSession(s.id) }) { Text("Reprendre") }
+                SmallText(onClick = { rename = s }) { Text("Renommer") }
+                if (!current) SmallText(onClick = { confirmDelete = s }) { Text("Supprimer") }
+                SmallText(onClick = {
                     val a = compareA
                     if (a == null || a.id == s.id) compareA = s
                     else { diff = Triple(a, s, SessionDiff.diff(ScanRepository.sessionEstimates(a.id), ScanRepository.sessionEstimates(s.id))); compareA = null }
@@ -193,11 +193,11 @@ private fun SessionsPanel(st: ScanStatus, currentCount: Int) {
             )
             if (entries.isEmpty()) Text("Aucune différence.", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = {
+                SmallOutlined(onClick = {
                     val ca = ScanRepository.sessionEstimates(a.id).count { it.value.confirmed }; val cb = ScanRepository.sessionEstimates(b.id).count { it.value.confirmed }
                     Exporter.share(ctx, Exporter.fileName("diff.md"), "text/plain", SessionDiff.text(a.name, b.name, entries, ca, cb))
                 }) { Text("Exporter le diff") }
-                OutlinedButton(onClick = { diff = null }) { Text("Fermer") }
+                SmallOutlined(onClick = { diff = null }) { Text("Fermer") }
             }
         }
     }
@@ -205,8 +205,8 @@ private fun SessionsPanel(st: ScanStatus, currentCount: Int) {
         var name by remember { mutableStateOf(s.name) }
         AlertDialog(
             onDismissRequest = { rename = null },
-            confirmButton = { TextButton(onClick = { ScanRepository.renameSession(s.id, name); rename = null }) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { rename = null }) { Text("Annuler") } },
+            confirmButton = { SmallText(onClick = { ScanRepository.renameSession(s.id, name); rename = null }) { Text("OK") } },
+            dismissButton = { SmallText(onClick = { rename = null }) { Text("Annuler") } },
             title = { Text("Nom de la session (le lieu)") },
             text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true) }
         )
@@ -214,8 +214,8 @@ private fun SessionsPanel(st: ScanStatus, currentCount: Int) {
     confirmDelete?.let { s ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            confirmButton = { TextButton(onClick = { ScanRepository.deleteSession(s.id); confirmDelete = null }) { Text("Supprimer") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Annuler") } },
+            confirmButton = { SmallText(onClick = { ScanRepository.deleteSession(s.id); confirmDelete = null }) { Text("Supprimer") } },
+            dismissButton = { SmallText(onClick = { confirmDelete = null }) { Text("Annuler") } },
             title = { Text("Supprimer « ${s.name} » ?") },
             text = { Text("Ses ${s.positioned} positions et ses observations seront effacées. Les appareils restent dans la base commune.") }
         )
@@ -246,8 +246,8 @@ private fun BatteryBanner(st: ScanStatus) {
             color = Palette.amber, fontFamily = FontFamily.Monospace, fontSize = 11.sp
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!ignoring) OutlinedButton(onClick = { requestIgnoreBatteryOptimizations(ctx) }) { Text("Désactiver") }
-            OutlinedButton(onClick = { guide = !guide }) { Text(if (guide) "Masquer le guide" else "Réglages téléphone") }
+            if (!ignoring) SmallOutlined(onClick = { requestIgnoreBatteryOptimizations(ctx) }) { Text("Désactiver") }
+            SmallOutlined(onClick = { guide = !guide }) { Text(if (guide) "Masquer le guide" else "Réglages téléphone") }
         }
         if (guide) Text(GUIDE, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     }
@@ -278,15 +278,15 @@ private fun SettingsPanel(st: ScanStatus, onQuit: () -> Unit) {
             Text("Désactiver automatiquement pendant les relevés, restaurer à l'arrêt", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { SystemTweaks.setThrottle(ctx, false); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Désactiver maintenant") }
-            OutlinedButton(onClick = { SystemTweaks.setThrottle(ctx, true); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Rétablir") }
+            SmallOutlined(onClick = { SystemTweaks.setThrottle(ctx, false); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Désactiver maintenant") }
+            SmallOutlined(onClick = { SystemTweaks.setThrottle(ctx, true); throttle = SystemTweaks.throttleEnabled(ctx) }) { Text("Rétablir") }
         }
     } else {
         Text("Pour que l'app la bascule elle-même (une fois, en USB) :", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
         Text(SystemTweaks.ADB_GRANT, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { clipboard.setText(AnnotatedString(SystemTweaks.ADB_GRANT)) }) { Text("Copier") }
-            OutlinedButton(onClick = { open(ctx, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }) { Text("Options développeur") }
+            SmallOutlined(onClick = { clipboard.setText(AnnotatedString(SystemTweaks.ADB_GRANT)) }) { Text("Copier") }
+            SmallOutlined(onClick = { open(ctx, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }) { Text("Options développeur") }
         }
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -295,9 +295,9 @@ private fun SettingsPanel(st: ScanStatus, onQuit: () -> Unit) {
         Text("pour le télémètre par visée (◎ Viser)", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.weight(1f))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { try { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {} }) { Text("Infos de l'app") }
-        OutlinedButton(onClick = { open(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS) }) { Text("Localisation") }
-        OutlinedButton(onClick = onQuit, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Quitter proprement") }
+        SmallOutlined(onClick = { try { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {} }) { Text("Infos de l'app") }
+        SmallOutlined(onClick = { open(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS) }) { Text("Localisation") }
+        SmallOutlined(onClick = onQuit, colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.amber)) { Text("Quitter proprement") }
     }
     Text("Quitter proprement : arrête les relevés, restaure les réglages changés, ferme l'app.", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
 }

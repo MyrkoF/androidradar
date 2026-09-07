@@ -103,10 +103,10 @@ fun RangeFinderScreen(d: Device, st: ScanStatus, onClose: () -> Unit) {
                 if (saved != null) Text("✓ ${"%.1f".format(saved)} m enregistrée → position recalculée", color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             }
             Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).background(Palette.surface.copy(alpha = 0.85f)).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(enabled = dist != null, onClick = {
+                SmallButton(enabled = dist != null, onClick = {
                     dist?.let { ScanRepository.setRanging(d.id, it, it * RangeFinder.REL_ERROR); saved = it }
                 }) { Text("Enregistrer la distance") }
-                OutlinedButton(onClick = onClose) { Text("Fermer") }
+                SmallOutlined(onClick = onClose) { Text("Fermer") }
             }
         }
     }

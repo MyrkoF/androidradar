@@ -50,7 +50,7 @@ fun ArStatusLine() {
         Text("Prérequis suivi caméra (ARCore) : ${state.label}", color = color, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
         when (state) {
             ArState.INSTALL -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
+                SmallOutlined(onClick = {
                     try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.ar.core")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     catch (_: Exception) { try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.ar.core")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {} }
                 }) { Text("Installer depuis le Play Store") }

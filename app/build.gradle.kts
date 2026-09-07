@@ -12,8 +12,8 @@ android {
         applicationId = "ch.lab77.radar"
         minSdk = 33
         targetSdk = 35
-        versionCode = 18
-        versionName = "0.2.13"
+        versionCode = 19
+        versionName = "0.2.14"
     }
 
     signingConfigs {

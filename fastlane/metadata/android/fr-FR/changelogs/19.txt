@@ -1,0 +1,2 @@
+- Pop-up au tap : moniteur du radar dessiné par-dessus le disque (il était dessous) ; carte : zone de toucher 24 dp autour du doigt, points plus gros ; zoom carte jusqu'à 22
+- Boutons compacts sur toute l'app

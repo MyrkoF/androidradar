@@ -55,8 +55,8 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
                 d.name.ifBlank { if (d.kind == Kind.WIFI) "<SSID caché>" else d.vendor.ifBlank { d.id } },
                 color = Palette.text, fontSize = 14.sp, modifier = Modifier.weight(1f), maxLines = 1
             )
-            TextButton(onClick = { full = !full }) { Text(if (full) "▲" else "ⓘ") }
-            TextButton(onClick = onClose) { Text("✕") }
+            SmallText(onClick = { full = !full }) { Text(if (full) "▲" else "ⓘ") }
+            SmallText(onClick = onClose) { Text("✕") }
         }
         Text(
             "${d.rssi} dBm · ${d.kind.name} · ${d.category.label}" +
@@ -67,9 +67,9 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         var aiming by rememberSaveable { mutableStateOf(false) }
         var ar by rememberSaveable { mutableStateOf(false) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
-            TextButton(onClick = { ar = true }) { Text("📷 Pointer") }
-            TextButton(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }
+            SmallText(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
+            SmallText(onClick = { ar = true }) { Text("📷 Pointer") }
+            SmallText(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }
         }
         if (aiming) RangeFinderScreen(d, st) { aiming = false }
         if (ar) ArScreen(d) { ar = false }

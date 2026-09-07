@@ -1,0 +1,2 @@
+- Tap popup: radar monitor drawn above the disc (it was below); map: 24 dp touch area, bigger dots; map zoom up to 22
+- Compact buttons across the app
