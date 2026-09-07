@@ -232,8 +232,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             manual?.let { ll ->
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { manual = null },
-                    confirmButton = { androidx.compose.material3.SmallText(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
-                    dismissButton = { androidx.compose.material3.SmallText(onClick = { manual = null }) { Text("Annuler") } },
+                    confirmButton = { SmallText(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
+                    dismissButton = { SmallText(onClick = { manual = null }) { Text("Annuler") } },
                     title = { Text("Poser ma position ici ?") },
                     text = { Text("Ancre en intérieur (±3 m) : les pas, la boussole et la caméra repartent de ce point ; un bon fix GPS reprendra la main dehors.") }
                 )
