@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Estimate
 import ch.lab77.radar.data.Estimator
+import ch.lab77.radar.data.ConfidenceRules
 import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
@@ -60,6 +61,7 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
             SmallText(onClick = { full = !full }) { Text(if (full) "▲" else "ⓘ") }
             SmallText(onClick = onClose) { Text("✕") }
         }
+        ConfidenceLine(ConfidenceRules.objectPosition(d, e))
         // Distance depuis moi (position calculée) et distance d'après le signal (ordre de grandeur) — retour n°10
         val fromMe = if (e?.lat != null && e.lon != null && st.lat != null && st.lon != null) Estimator.distanceM(st.lat, st.lon, e.lat, e.lon).toInt() else null
         val bySignal = Estimator.floorRadius(d.rssi, d.kind).toInt()

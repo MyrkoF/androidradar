@@ -152,7 +152,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                     PropertyFactory.circleRadius(Expression.get("r")),
                     PropertyFactory.circleOpacity(Expression.get("op")),
                     PropertyFactory.circleStrokeColor(Expression.toColor(Expression.get("stroke"))),
-                    PropertyFactory.circleStrokeWidth(1.5f)))
+                    PropertyFactory.circleStrokeWidth(Expression.get("sw"))))
                 style.addLayer(SymbolLayer("devices-label", "devices").withProperties(
                     PropertyFactory.textField(Expression.get("label")), PropertyFactory.textFont(MapConfig.FONTS),
                     PropertyFactory.textSize(11f), PropertyFactory.textOffset(arrayOf(0f, 1.3f)),
@@ -240,7 +240,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             }
             Text(
                 "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore (Google Play Services for AR requis) · appui long sur la carte = « Je suis ici » · tap un objet → moniteur : ◎ Viser, 📷 Pointer, Connu\n" +
-                    "$placedCount posés · ● Wi-Fi ● BLE ● Cell · anneau rouge = à surveiller · estompé = indéterminé · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
+                    "$placedCount posés · ● Wi-Fi ● BLE ● Cell · plein = position confirmée · estompé = approximative (souvent posé sur toi) · anneau rouge = à surveiller · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
                     MapConfig.ATTRIBUTION,
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
             )

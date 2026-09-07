@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
+import ch.lab77.radar.data.ConfidenceRules
 
 @Composable
 fun App(onWifi: (Boolean) -> Unit, onBle: (Boolean) -> Unit, onCell: (Boolean) -> Unit, onQuit: () -> Unit, onStopAll: () -> Unit = {}) {
@@ -93,5 +94,6 @@ private fun StatusBar(st: ScanStatus, count: Int, onWifi: (Boolean) -> Unit, onB
             CompactChip(st.cellOn, { onCell(!st.cellOn) }, "Cell", selectedColor = Palette.orange, leadingIcon = { Icon(Icons.Default.CellTower, null) })
             CompactChip(st.alertsOn, { ScanRepository.setAlerts(!st.alertsOn) }, "Bip")
         }
+        ConfidenceLine(ConfidenceRules.myPosition(st), big = true)
     }
 }

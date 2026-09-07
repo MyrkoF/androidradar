@@ -1,3 +1,4 @@
 - Tap popup: radar monitor drawn above the disc (it was below); map: 24 dp touch area, bigger dots; map zoom up to 22
 - Compact buttons across the app
 - Session: How-to (step by step) and Sensor self-test; monitor: distance from me + signal ~ m, help line, Point hidden without ARCore
+- Plain-language confidence (green / amber / red + what to do): my position in the bar, each object in the monitor, list and map

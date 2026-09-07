@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Category
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Kind
+import ch.lab77.radar.data.ConfidenceRules
+import ch.lab77.radar.data.ScanRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun ListScreen(devices: Map<String, Device>) {
@@ -60,6 +63,7 @@ fun ListScreen(devices: Map<String, Device>) {
             }
             Mono("Pastille = catégorie déduite du FABRICANT (adresse MAC) — une déduction, pas une certitude")
             Mono("Rouge / ambre / violet = à surveiller (bip à l'apparition)")
+            Mono("Petite pastille à droite = confiance dans sa POSITION : vert sûre, orange approximative, rouge inconnue")
             Mono("Chiffre = signal dBm : rouge ≥ -55 (très proche), ambre ≥ -70, vert ≥ -85, gris au-delà")
             Mono("« vu 25× » = nombre d'observations dans la session · ligne grisée = plus vu depuis 1 min")
             Mono("⚙ en haut à droite = filtres (types, catégories, disparus), communs à Liste, Radar et Carte")
@@ -92,9 +96,16 @@ private fun DeviceRow(d: Device, open: Boolean, onClick: () -> Unit) {
                     color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 1
                 )
             }
+            val est by ScanRepository.estimates.collectAsStateWithLifecycle()
+            val conf = ConfidenceRules.objectPosition(d, est[d.id])
+            Box(Modifier.size(8.dp).background(levelColor(conf.level), CircleShape))
             Text("vu ${d.seenCount}×", color = Palette.muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
-        if (open) Column(Modifier.padding(start = 20.dp, top = 6.dp)) { DeviceDetail(d) }
+        if (open) Column(Modifier.padding(start = 20.dp, top = 6.dp)) {
+            val est by ScanRepository.estimates.collectAsStateWithLifecycle()
+            ConfidenceLine(ConfidenceRules.objectPosition(d, est[d.id]))
+            DeviceDetail(d)
+        }
     }
 }
 
