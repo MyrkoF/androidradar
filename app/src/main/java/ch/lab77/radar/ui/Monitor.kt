@@ -23,11 +23,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.Estimate
+import ch.lab77.radar.data.Estimator
 import ch.lab77.radar.data.Kind
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
@@ -58,6 +60,13 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
             SmallText(onClick = { full = !full }) { Text(if (full) "▲" else "ⓘ") }
             SmallText(onClick = onClose) { Text("✕") }
         }
+        // Distance depuis moi (position calculée) et distance d'après le signal (ordre de grandeur) — retour n°10
+        val fromMe = if (e?.lat != null && e.lon != null && st.lat != null && st.lon != null) Estimator.distanceM(st.lat, st.lon, e.lat, e.lon).toInt() else null
+        val bySignal = Estimator.floorRadius(d.rssi, d.kind).toInt()
+        Text(
+            "à ~${fromMe?.let { "$it m" } ?: "? m"} de moi (position calculée) · signal ≈ ${bySignal} m",
+            color = Palette.green, fontFamily = FontFamily.Monospace, fontSize = 12.sp
+        )
         Text(
             "${d.rssi} dBm · ${d.kind.name} · ${d.category.label}" +
                 (e?.takeIf { it.lat != null }?.let { " · ±${it.radius.toInt()} m · ${it.n} obs · ${it.persistence.label}" + (if (it.rttFix) " · RTT" else "") + (if (it.locked) " · 🔒 stable" else "") + (if (it.bearingFix) " · △ triangulé" else "") } ?: " · pas encore positionné"),
@@ -66,9 +75,14 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
         var aiming by rememberSaveable { mutableStateOf(false) }
         var ar by rememberSaveable { mutableStateOf(false) }
+        val arOk = arState(LocalContext.current).let { it == ArState.READY || it == ArState.INSTALL }
+        Text(
+            "◎ Viser = mesurer la distance (viser son pied) · " + (if (arOk) "📷 Pointer = le poser exactement (caméra) · " else "") + "Connu = ne plus alerter",
+            color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+        )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             SmallText(onClick = { aiming = true }, enabled = st.pitch != null) { Text("◎ Viser") }
-            SmallText(onClick = { ar = true }) { Text("📷 Pointer") }
+            if (arOk) SmallText(onClick = { ar = true }) { Text("📷 Pointer") }
             SmallText(onClick = { ScanRepository.setKnown(d.id, d.id !in known) }) { Text(if (d.id in known) "✓ Connu" else "Connu ?") }
         }
         if (aiming) RangeFinderScreen(d, st) { aiming = false }

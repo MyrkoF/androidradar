@@ -70,6 +70,8 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
     var openSessions by rememberSaveable { mutableStateOf(false) }
     var openSettings by rememberSaveable { mutableStateOf(true) }
     var openJournal by rememberSaveable { mutableStateOf(true) }
+    var openHowTo by rememberSaveable { mutableStateOf(false) }
+    var openSelfTest by rememberSaveable { mutableStateOf(false) }
     val known by ScanRepository.whitelist.collectAsStateWithLifecycle()
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -87,6 +89,8 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
         item { Section("Exports (CSV, GeoJSON, JSON, débrief, diagnostic)", openExports, { openExports = !openExports }) { ExportsPanel(all, st, onStopAll) } }
         item { Section("Sessions (reprendre, renommer, comparer deux visites, liste blanche)", openSessions, { openSessions = !openSessions; if (openSessions) ScanRepository.refreshSessions() }) { SessionsPanel(st, all.size) } }
         item { Section("Réglages (hauteur des yeux, limitation Wi-Fi, raccourcis, quitter)", openSettings, { openSettings = !openSettings }) { SettingsPanel(st, onQuit) } }
+        item { Section("Comment faire (pas à pas)", openHowTo, { openHowTo = !openHowTo }) { HowToPanel() } }
+        item { Section("Autotest des capteurs (valeurs en direct)", openSelfTest, { openSelfTest = !openSelfTest }) { SelfTestPanel(st) } }
         item { Section("Journal", openJournal, { openJournal = !openJournal }) {} }
         if (openJournal) items(log) { line ->
             Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = if (line.startsWith("!!")) Palette.amber else Palette.text,
@@ -334,3 +338,53 @@ Xiaomi (HyperOS)
 Vérification : Wi-Fi + BLE lancés, écran éteint 10 min ; le compteur doit monter
 et le journal ne doit pas contenir de ligne « aucun résultat depuis ».
 """.trimIndent()
+
+
+/** Les gestes pas à pas (retour Myrko n°9 : « il faut une information sur comment faire les choses »). */
+@Composable
+private fun HowToPanel() {
+    Text(HOWTO, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+}
+
+private val HOWTO = """
+RADAR = maintenant, autour de moi (qui émet, à quelle force). Pour CHERCHER.
+CARTE = où sont les objets, calculé au fil des mesures. Pour PLACER, VÉRIFIER, COMPARER.
+
+1. Démarrer une mesure : puces Wi-Fi / BLE / Cell en haut (colorées = actif). Écran éteint OK.
+   Dehors, attendre « GPS » en vert dans la barre (≥ 4 satellites).
+   Dedans : appui long sur la carte → « Je suis ici » pour t'ancrer.
+2. Trouver un objet : Radar → toucher son point → moniteur en haut à droite.
+   Tourner lentement sur soi-même téléphone devant (un tour ≈ 60 s en Wi-Fi) : la rose
+   indique la direction ; « approche / éloigne » dit si tu te rapproches. Voyant vert =
+   bon rythme, rouge = trop vite.
+3. Mesurer sa distance : moniteur → « ◎ Viser », téléphone à hauteur des yeux, viser le
+   PIED de l'objet, « Enregistrer ». (Hauteur des yeux : Réglages.)
+4. Le placer sur la carte : le voir depuis plusieurs endroits (marcher autour), ou deux
+   tours sur soi-même depuis deux endroits (△), ou « Pointer » avec la caméra si ARCore.
+   « 🔒 stable » = position figée. Un objet vu d'un seul endroit est posé SUR toi, ± un rayon.
+5. Nouvelle session = nouveau lieu ou nouvelle visite. Reprendre = continuer une ancienne.
+   Comparer A puis B = nouveaux / disparus / déplacés.
+6. Exporter : PROPRE = positions confirmées ; BRUT = tout ; Diagnostic = pour le développeur.
+7. Vérifier que ça marche : chaque action écrit une ligne dans le Journal ; l'Autotest
+   ci-dessous montre les capteurs en direct.
+""".trimIndent()
+
+/** Chaque capteur en direct : on voit de ses yeux ce qui répond. */
+@Composable
+private fun SelfTestPanel(st: ScanStatus) {
+    val ctx = LocalContext.current
+    fun ok(b: Boolean) = if (b) "✓" else "✗"
+    val camOk = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    val lines = listOf(
+        "GPS : ${if (st.gpsFix) "fix ±${st.accuracy?.toInt() ?: 0} m" else "pas de fix"} · satellites ${st.satsUsed} utilisés / ${st.satsVisible} vus ${ok(st.satsUsed >= 4)}",
+        "Position : ${when { st.deadReckoning -> "ESTIME (pas + cap)"; st.gpsHeld -> "GPS tenu ⏸"; st.gpsFix -> "GPS"; else -> "—" }} · ${st.lat?.let { "%.5f".format(it) } ?: "?"}, ${st.lon?.let { "%.5f".format(it) } ?: "?"}",
+        "Boussole : cap ${st.heading?.toInt()?.let { "$it°" } ?: "—"} ${ok(st.heading != null)} · inclinaison caméra ${st.pitch?.toInt()?.let { "$it°" } ?: "—"} (tourne et incline le téléphone)",
+        "Gyroscope : ${st.turnRateDps.toInt()} °/s · Pas : ${st.steps} (${"%.1f".format(st.stepRate)} pas/s) ${ok(st.stepsKnown)}",
+        "Baromètre : ${st.pressureHpa?.let { "%.1f hPa".format(it) } ?: "—"} · Δalt ${st.baroAltM?.let { "%+.1f m".format(it) } ?: "—"} ${ok(st.pressureHpa != null)}",
+        "Wi-Fi ${ok(st.wifiOn)} (${st.wifiScans} scans${if (st.wifiThrottled) ", BRIDÉ" else ""}) · BLE ${ok(st.bleOn)} · Cell ${ok(st.cellOn)}",
+        "Caméra : permission ${ok(camOk)} · ARCore : ${arState(ctx).label}",
+        "Sonde externe : ${st.probe.ifBlank { "aucune" }} · Capteurs : ${st.sensors.ifBlank { "(au démarrage d'un relevé)" }}",
+    )
+    for (l in lines) Text(l, color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+    Text("Les valeurs bougent en direct tant qu'un relevé tourne (puces actives).", color = Palette.muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+}
