@@ -185,18 +185,30 @@ object Estimator {
      * alors que le téléphone s'est déplacé. `stationnaire` : vu longtemps depuis plusieurs positions.
      * Une cellule mobile est stationnaire par nature.
      */
-    fun persistence(firstSeen: Long, lastSeen: Long, now: Long, obs: List<Obs>, kind: Kind = Kind.WIFI): Persistence {
+    /**
+     * Persistance revue (cahier §3 quater) : le temps et la stabilité du signal d'abord ; l'étendue spatiale
+     * ne compte que sur des positions de qualité (≤ 10 m). `rssiSamples` = niveaux récents (60 s) même sans position.
+     */
+    fun persistence(firstSeen: Long, lastSeen: Long, now: Long, obs: List<Obs>, kind: Kind = Kind.WIFI, rssiSamples: List<Int> = emptyList()): Persistence {
         if (kind == Kind.CELL) return Persistence.STATIONARY
         val span = lastSeen - firstSeen
         val gone = now - lastSeen
         if (gone > 60_000 && span < 120_000) return Persistence.PASSING
-        if (obs.size >= 3) {
-            val spread = spreadM(obs)
-            val rssi = obs.map { it.rssi.toDouble() }
-            val mean = rssi.average()
-            val std = sqrt(rssi.sumOf { (it - mean) * (it - mean) } / rssi.size)
+        val good = obs.filter { it.acc <= ObserverRules.OUTDOOR_M }
+        val levels = (if (good.size >= 3) good.map { it.rssi } else rssiSamples).map { it.toDouble() }
+        if (good.size >= 3) {
+            val spread = spreadM(good)
+            val mean = levels.average()
+            val std = sqrt(levels.sumOf { (it - mean) * (it - mean) } / levels.size)
             if (spread >= 30.0 && std < 4.0 && mean >= -70.0) return Persistence.WITH_ME
-            if (span >= 180_000 && spread >= 10.0) return Persistence.STATIONARY
+            if (span >= 180_000 && spread >= 10.0 && std < 12.0) return Persistence.STATIONARY
+            return Persistence.UNKNOWN
+        }
+        // Sans positions de qualité : stationnaire si vu longtemps avec un signal stable
+        if (span >= 300_000 && levels.size >= 5) {
+            val mean = levels.average()
+            val std = sqrt(levels.sumOf { (it - mean) * (it - mean) } / levels.size)
+            if (std < 6.0) return Persistence.STATIONARY
         }
         return Persistence.UNKNOWN
     }

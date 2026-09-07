@@ -37,6 +37,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ch.lab77.radar.data.Anchor
 import ch.lab77.radar.data.Device
 import ch.lab77.radar.data.ScanRepository
 import ch.lab77.radar.data.ScanStatus
@@ -84,6 +85,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
     var maxZoom by rememberSaveable { mutableStateOf(15) }
     var headUp by rememberSaveable { mutableStateOf(false) }
     var manual by remember { mutableStateOf<LatLng?>(null) }
+    var anchorTap by remember { mutableStateOf<Long?>(null) }
+    val anchors by ScanRepository.anchors.collectAsStateWithLifecycle()
     var arOpen by rememberSaveable { mutableStateOf(false) }
     var aimOpen by rememberSaveable { mutableStateOf(false) }
     var savedCam by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
@@ -122,6 +125,8 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             m.addOnMapClickListener { ll ->
                 val pt: PointF = m.projection.toScreenLocation(ll)
                 val r = 24f * ctx.resources.displayMetrics.density
+                val anchorHit = m.queryRenderedFeatures(android.graphics.RectF(pt.x - r, pt.y - r, pt.x + r, pt.y + r), "anchors").firstOrNull()
+                if (anchorHit != null) { anchorTap = anchorHit.getNumberProperty("id")?.toLong(); return@addOnMapClickListener true }
                 val hits = m.queryRenderedFeatures(android.graphics.RectF(pt.x - r, pt.y - r, pt.x + r, pt.y + r), "devices")
                 // le plus proche du doigt
                 selected = hits.minByOrNull { f ->
@@ -137,6 +142,7 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                 style.addSource(GeoJsonSource("trace"))
                 style.addSource(GeoJsonSource("devices"))
                 style.addSource(GeoJsonSource("me"))
+                style.addSource(GeoJsonSource("anchors"))
                 style.addLayer(FillLayer("uncert-fill", "uncert").withProperties(
                     PropertyFactory.fillColor(Expression.toColor(Expression.get("color"))), PropertyFactory.fillOpacity(0.10f)))
                 style.addLayer(LineLayer("uncert-line", "uncert").withProperties(
@@ -158,6 +164,11 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
                     PropertyFactory.textSize(11f), PropertyFactory.textOffset(arrayOf(0f, 1.3f)),
                     PropertyFactory.textColor("#D9E4E8"), PropertyFactory.textHaloColor("#0B1215"), PropertyFactory.textHaloWidth(1.2f),
                     PropertyFactory.textOptional(true)))
+                style.addLayer(CircleLayer("anchors", "anchors").withProperties(
+                    PropertyFactory.circleColor("#FFB74D"), PropertyFactory.circleRadius(9f), PropertyFactory.circleStrokeColor("#0B1215"), PropertyFactory.circleStrokeWidth(2f)))
+                style.addLayer(SymbolLayer("anchors-label", "anchors").withProperties(
+                    PropertyFactory.textField(Expression.get("name")), PropertyFactory.textFont(MapConfig.FONTS), PropertyFactory.textSize(11f),
+                    PropertyFactory.textOffset(arrayOf(0f, 1.3f)), PropertyFactory.textColor("#FFB74D"), PropertyFactory.textHaloColor("#0B1215"), PropertyFactory.textHaloWidth(1.2f)))
                 style.addLayer(FillLayer("me-cone", "me").withProperties(
                     PropertyFactory.fillColor("#5CB8FF"), PropertyFactory.fillOpacity(0.25f)))
                 style.addLayer(CircleLayer("me", "me").withProperties(
@@ -183,6 +194,12 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             style.getSourceAs<GeoJsonSource>("obs")?.setGeoJson(
                 if (selDev != null) GeoJson.observations(ScanRepository.observationsOf(selDev.id), selDev.kind) else GeoJson.observations(emptyList(), ch.lab77.radar.data.Kind.WIFI))
         }
+    }
+    LaunchedEffect(styleReady, anchors) {
+        if (!styleReady) return@LaunchedEffect
+        map?.style?.getSourceAs<GeoJsonSource>("anchors")?.setGeoJson(org.maplibre.geojson.FeatureCollection.fromFeatures(anchors.map { a ->
+            org.maplibre.geojson.Feature.fromGeometry(org.maplibre.geojson.Point.fromLngLat(a.lon, a.lat)).apply { addNumberProperty("id", a.id); addStringProperty("name", a.name) }
+        }))
     }
     LaunchedEffect(styleReady) {
         if (!styleReady) return@LaunchedEffect
@@ -230,16 +247,37 @@ fun MapScreen(devices: Map<String, Device>, st: ScanStatus) {
             }
             if (arOpen) ArScreen(selected?.let { devices[it] }) { arOpen = false }
             manual?.let { ll ->
+                var anchorName by remember { mutableStateOf("") }
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { manual = null },
-                    confirmButton = { SmallText(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude); followMe = true; manual = null }) { Text("Je suis ici") } },
+                    confirmButton = {},
                     dismissButton = { SmallText(onClick = { manual = null }) { Text("Annuler") } },
-                    title = { Text("Poser ma position ici ?") },
-                    text = { Text("Ancre en intérieur (±3 m) : les pas, la boussole et la caméra repartent de ce point ; un bon fix GPS reprendra la main dehors.") }
+                    title = { Text("Ici, c'est…") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Ma position maintenant (calibre l'observateur) — précision que tu t'accordes :", fontSize = 12.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                for (acc in listOf(2f, 5f, 10f)) SmallOutlined(onClick = { ScanRepository.setManualPosition(ll.latitude, ll.longitude, acc); followMe = true; manual = null }) { Text("±${acc.toInt()} m") }
+                            }
+                            Text("Ou poser une ANCRE nommée à cet endroit (porte, coin…), pour y revenir plus tard :", fontSize = 12.sp)
+                            androidx.compose.material3.OutlinedTextField(value = anchorName, onValueChange = { anchorName = it }, singleLine = true, label = { Text("Nom de l'ancre") })
+                            SmallOutlined(enabled = anchorName.isNotBlank(), onClick = { ScanRepository.addAnchor(anchorName.trim(), ll.latitude, ll.longitude, 3f); manual = null }) { Text("Poser l'ancre (±3 m)") }
+                        }
+                    }
+                )
+            }
+            anchorTap?.let { id ->
+                val a = anchors.firstOrNull { it.id == id }
+                if (a == null) anchorTap = null else androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { anchorTap = null },
+                    confirmButton = { SmallText(onClick = { ScanRepository.atAnchor(a); followMe = true; anchorTap = null }) { Text("Je suis à l'ancre « ${a.name} »") } },
+                    dismissButton = { Row { SmallText(onClick = { ScanRepository.deleteAnchor(a.id); anchorTap = null }) { Text("Supprimer") }; SmallText(onClick = { anchorTap = null }) { Text("Annuler") } } },
+                    title = { Text("Ancre « ${a.name} »") },
+                    text = { Text("Confirmer que tu es dessus recalibre ta position à ±${a.acc.toInt()} m.") }
                 )
             }
             Text(
-                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore (Google Play Services for AR requis) · appui long sur la carte = « Je suis ici » · tap un objet → moniteur : ◎ Viser, 📷 Pointer, Connu\n" +
+                "Suivre = centrer sur moi · Orienter = cap en haut · Stationnaires⇄Tout = montrer ou non passants, MAC aléatoires, indéterminés · Hors ligne = télécharger la vue · 📷 Caméra = suivi ARCore (Google Play Services for AR requis) · appui long sur la carte = « Je suis ici » (calibre) ou poser une ancre · tap une ancre = « j'y suis » · tap un objet → moniteur : ◎ Viser, 📷 Pointer, Connu\n" +
                     "$placedCount posés · ● Wi-Fi ● BLE ● Cell · plein = position confirmée · estompé = approximative (souvent posé sur toi) · anneau rouge = à surveiller · tap = moniteur ; l'objet choisi montre ses points d'observation (taille = signal) et son cercle d'incertitude\n" +
                     MapConfig.ATTRIBUTION,
                 color = Palette.muted, fontSize = 10.sp, fontFamily = FontFamily.Monospace

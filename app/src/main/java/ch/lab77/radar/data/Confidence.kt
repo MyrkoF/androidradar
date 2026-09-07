@@ -10,6 +10,17 @@ data class Confidence(val level: Level, val text: String, val hint: String)
 
 object ConfidenceRules {
     fun myPosition(st: ScanStatus): Confidence {
+        val o = st.observer
+        val (text, hint) = ObserverRules.describe(o)
+        return when (o.state) {
+            CalState.CALIBRATED -> Confidence(Level.SURE, text, hint)
+            CalState.DEGRADED -> Confidence(Level.APPROX, text, hint)
+            CalState.UNCALIBRATED -> Confidence(Level.NONE, text, hint)
+        }
+    }
+
+    @Suppress("unused")
+    private fun legacyMyPosition(st: ScanStatus): Confidence {
         val acc = st.accuracy?.toInt()
         return when {
             st.lat == null -> Confidence(Level.NONE, "Position inconnue", "Dehors : attendre le GPS. Dedans : appui long sur la carte → « Je suis ici ».")

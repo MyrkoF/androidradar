@@ -1,0 +1,5 @@
+- Reliable base: nothing is placed on the map until position is calibrated (GPS <= 10 m / >= 6 sats outdoors; "I am here" +-2/5/10 m or named anchor indoors); precision budget 5 m indoors / 10 m outdoors, measurements pause beyond it, plain-language status line
+- Indoor anchors: place named anchors, "I am at the anchor" to recalibrate
+- Qualified observations: only those taken with a calibrated position do positioning; persistence = time + signal stability
+- Evidence per object: viewpoints, angular coverage, radius history, next move; session summary
+- Opaque popup that blocks touch; compact buttons; how-to; self-test; plain-language confidence; distance from me

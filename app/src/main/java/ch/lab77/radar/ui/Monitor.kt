@@ -23,6 +23,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import ch.lab77.radar.data.EvidenceRules
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -49,7 +52,9 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         onDispose { ScanRepository.setGuideTarget(null) }
     }
     Column(
-        Modifier.widthIn(max = 300.dp).heightIn(max = 420.dp).background(Palette.surface2.copy(alpha = 0.97f)).border(1.dp, Palette.green).padding(8.dp)
+        Modifier.widthIn(max = 300.dp).heightIn(max = 460.dp).background(Palette.surface2).border(1.dp, Palette.green)
+            .pointerInput(Unit) { detectTapGestures { } }        // opaque et BLOQUE le toucher : rien ne passe au radar / à la carte (retour n°12)
+            .padding(8.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -91,6 +96,14 @@ fun Monitor(d: Device, e: Estimate?, st: ScanStatus, onClose: () -> Unit) {
         if (ar) ArScreen(d) { ar = false }
         PaceIndicator(st, d.kind)
         WalkGuide(d, st, compact = !full)
+        // Preuves : d'où il a été vu, couverture, rayon, prochain geste (cahier §3 quater)
+        val ev = EvidenceRules.of(ScanRepository.observationsOf(d.id), e, ScanRepository.radiusHistoryOf(d.id))
+        Text(
+            "Preuves : ${ev.viewpoints} point(s) de vue · couverture ${ev.coverageDeg}° / 360°" +
+                (if (ev.radiusHistory.size >= 2) " · rayon ${ev.radiusHistory.first().toInt()} → ${ev.radiusHistory.last().toInt()} m" else ""),
+            color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+        )
+        Text("→ " + ev.nextMove, color = Palette.amber, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
         if (full) {
             if (e != null && e.lat != null) Text(
                 (if (e.rttFix) "Position TRILATÉRÉE (RTT) " else "Position estimée ") + "${"%.5f".format(e.lat)}, ${"%.5f".format(e.lon)}" +

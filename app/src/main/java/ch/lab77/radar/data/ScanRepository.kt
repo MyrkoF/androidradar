@@ -68,7 +68,7 @@ object ScanRepository {
     fun init(ctx: Context) {
         if (db == null) {
             db = Db(ctx.applicationContext)
-            io.execute { try { _whitelist.value = db?.whitelist() ?: emptySet(); refreshSessions() } catch (_: Exception) {} }
+            io.execute { try { _whitelist.value = db?.whitelist() ?: emptySet(); refreshSessions(); refreshAnchors() } catch (_: Exception) {} }
         }
         Oui.load(ctx)
         if (_status.value.sessionStart == 0L) openSession()
@@ -134,6 +134,59 @@ object ScanRepository {
     /** Position du téléphone. `estimated` = à l'estime (pas + cap), jamais confondue avec un fix GPS. */
     @Volatile var lastRealFixAt = 0L
         private set
+    // ---- Observateur (cahier §3 quater) : calibration, budget de précision, ancres ----
+    private var anchorAcc: Float? = null
+    private var anchorSource = ""
+    private var anchorT = 0L
+    private var stepsAtAnchor = 0
+    private var walkedSinceAnchor = 0.0
+    private var lastTrustedFixT = 0L
+    private val recentTrusted = ArrayDeque<PositionFilter.Fix>()
+    private val _anchors = MutableStateFlow<List<Anchor>>(emptyList())
+    val anchors: StateFlow<List<Anchor>> = _anchors.asStateFlow()
+    private val radiusHistory = HashMap<String, ArrayList<Float>>()
+
+    fun setEnvMode(m: EnvMode) { _status.update { it.copy(envMode = m) }; refreshObserver() }
+
+    /** Recalcule l'état de l'observateur (précision courante = ancre + dérive) et le publie. */
+    private fun refreshObserver() {
+        val st = _status.value
+        val now = System.currentTimeMillis()
+        val env = ObserverRules.env(st.envMode, lastTrustedFixT, now)
+        val a = anchorAcc
+        val steps = st.steps - stepsAtAnchor
+        val acc = if (a == null) Float.MAX_VALUE else ObserverRules.currentAcc(a, steps, walkedSinceAnchor)
+        val state = ObserverRules.state(a, acc, env)
+        val prev = st.observer
+        val o = Observer(state, env, acc, anchorSource, anchorT, steps, walkedSinceAnchor)
+        _status.update { it.copy(observer = o) }
+        if (prev.state != state) logLine(when (state) {
+            CalState.CALIBRATED -> "Calibration : position ±${acc.toInt()} m (${anchorSource}) — les mesures comptent"
+            CalState.DEGRADED -> "!! Précision perdue ±${acc.toInt()} m (seuil ${ObserverRules.threshold(env).toInt()} m) — mesures de position en pause"
+            CalState.UNCALIBRATED -> "Position non calibrée"
+        })
+    }
+
+    private fun setAnchor(acc: Float, source: String) {
+        anchorAcc = acc; anchorSource = source; anchorT = System.currentTimeMillis()
+        stepsAtAnchor = _status.value.steps; walkedSinceAnchor = 0.0
+        refreshObserver()
+    }
+
+    fun refreshAnchors() { io.execute { try { _anchors.value = db?.anchors() ?: emptyList() } catch (_: Exception) {} } }
+    fun addAnchor(name: String, lat: Double, lon: Double, acc: Float) { io.execute { try { db?.addAnchor(name, lat, lon, acc) } catch (_: Exception) {}; refreshAnchors(); logLine("Ancre « $name » posée (±${acc.toInt()} m)") } }
+    fun deleteAnchor(id: Long) { io.execute { try { db?.deleteAnchor(id) } catch (_: Exception) {}; refreshAnchors() } }
+
+    /** « Je suis à l'ancre X » : position = celle de l'ancre, précision = celle de l'ancre. */
+    fun atAnchor(a: Anchor) {
+        setLocation(Location("ancre").apply { latitude = a.lat; longitude = a.lon; accuracy = a.acc; time = System.currentTimeMillis() }, estimated = true)
+        setAnchor(a.acc, "ancre ${a.name}")
+        logLine("Je suis à l'ancre « ${a.name} » (±${a.acc.toInt()} m)")
+    }
+
+    /** Historique du rayon d'un objet (preuves). */
+    fun radiusHistoryOf(id: String): List<Float> = synchronized(radiusHistory) { radiusHistory[id]?.toList() ?: emptyList() }
+
     /** Dernier point accepté (GPS filtré ou estime) — c'est lui que voient la trace et les observations. */
     @Volatile var acceptedFix: PositionFilter.Fix? = null
         private set
@@ -162,6 +215,22 @@ object ScanRepository {
             when { estimated -> "pas + cap"; reanchored -> "réancré : 3 fixes fiables d'accord contre la position tenue"; ok -> "accepté"; else -> "rejeté : ${acceptedFix?.let { "saut de ${Estimator.distanceM(it.lat, it.lon, loc.latitude, loc.longitude).toInt()} m pour $stepsSince pas (tenu ±${it.acc.toInt()} m${if (it.estimated) ", estime" else ""})" } ?: "?"}" }))
         if (ok) {
             if (reanchored) logLine("!! Position réancrée sur le GPS (${next.acc.toInt()} m) : la position tenue était fausse de ${acceptedFix?.let { Estimator.distanceM(it.lat, it.lon, next.lat, next.lon).toInt() } ?: 0} m")
+            // Dérive depuis l'ancre : distance marchée (estime) ; ancres : GPS fiable calibré, manuel, ancre nommée, caméra
+            acceptedFix?.let { walkedSinceAnchor += Estimator.distanceM(it.lat, it.lon, next.lat, next.lon).coerceAtMost(50.0) }
+            when (loc.provider) {
+                "manuel" -> setAnchor(next.acc, "Je suis ici")
+                "ancre" -> {}                                    // setAnchor fait par atAnchor()
+                "ar" -> setAnchor(next.acc, "caméra")
+                "estime", "tenu" -> {}
+                else -> if (trusted) {
+                    lastTrustedFixT = now
+                    recentTrusted.addLast(next); while (recentTrusted.size > 6) recentTrusted.removeFirst()
+                    val env = ObserverRules.env(st.envMode, now, now)
+                    val already = anchorAcc != null && anchorSource.startsWith("GPS")
+                    if ((already && next.acc <= ObserverRules.threshold(env)) || ObserverRules.outdoorCalibrated(recentTrusted.toList(), now))
+                        setAnchor(next.acc, "GPS ${st.satsUsed} sat")
+                }
+            }
             acceptedFix = next; stepsAtAccepted = st.steps
             location = loc.also { it.time = now }
             _status.update {
@@ -179,6 +248,7 @@ object ScanRepository {
             acceptedFix = held.copy(t = now)
             _status.update { it.copy(gpsFix = true, gpsHeld = true, deadReckoning = false, accuracy = next.acc) }
         }
+        refreshObserver()
     }
 
     fun setAlerts(on: Boolean) = _status.update { it.copy(alertsOn = on) }
@@ -222,8 +292,10 @@ object ScanRepository {
             if (now - (lastBearingAt[id] ?: 0L) < 60_000) return@execute
             val loc = location?.takeIf { now - it.time < 60_000 } ?: return@execute
             val d = _devices.value[id] ?: return@execute
+            val observer = _status.value.observer
+            if (!observer.ok) { logLine("Direction $id ignorée : position non calibrée"); return@execute }
             lastBearingAt[id] = now
-            val acc = if (loc.hasAccuracy()) loc.accuracy else 30f
+            val acc = observer.acc
             synchronized(obsById) {
                 val list = obsById.getOrPut(id) { ArrayDeque() }
                 list.addLast(Obs(now, loc.latitude, loc.longitude, acc, rssi, _status.value.baroAltM, null, bearingDeg))
@@ -243,9 +315,9 @@ object ScanRepository {
     fun sweep(freqHz: Long, rssi: Int) = _sweep.update { it + (freqHz to rssi) }
 
     /** Position posée à la main (« Je suis ici », appui long sur la carte) : ancre en intérieur, ±3 m. */
-    fun setManualPosition(lat: Double, lon: Double) {
-        setLocation(Location("manuel").apply { latitude = lat; longitude = lon; accuracy = 3f; time = System.currentTimeMillis() }, estimated = true)
-        logLine("Position posée à la main : ${"%.5f".format(lat)}, ${"%.5f".format(lon)} ±3 m")
+    fun setManualPosition(lat: Double, lon: Double, acc: Float = 3f) {
+        setLocation(Location("manuel").apply { latitude = lat; longitude = lon; accuracy = acc; time = System.currentTimeMillis() }, estimated = true)
+        logLine("Position posée à la main : ${"%.5f".format(lat)}, ${"%.5f".format(lon)} ±${acc.toInt()} m")
     }
 
     /** Position directe d'un objet (pointé à la caméra ARCore) : observation à poids maximal, verrouillée. */
@@ -345,10 +417,11 @@ object ScanRepository {
             try { db?.upsert(d, prev == null, prev != null && rssi > prev.bestRssi, sessionId) } catch (_: Exception) {}
 
             // Estimation de position : une observation par relevé géolocalisé
-            if (loc != null) synchronized(obsById) {
+            val observer = _status.value.observer
+            if (loc != null && observer.ok) synchronized(obsById) {
                 val list = obsById.getOrPut(id) { ArrayDeque() }
                 val fresh = rtt[id]?.first   // distance mesurée récente (RTT toutes les ~12 s)
-                val acc = if (loc.hasAccuracy()) loc.accuracy else 30f
+                val acc = observer.acc                            // précision de l'OBSERVATEUR, pas celle annoncée par le fix
                 val last = list.lastOrNull()
                 if (Estimator.samePlace(last, loc.latitude, loc.longitude) && last!!.bearing == null) {
                     // (a) même endroit : on garde la meilleure lecture, sans empiler
@@ -359,8 +432,13 @@ object ScanRepository {
                 }
             }
             val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
-            val est = Estimator.estimate(obs, kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, kind), _estimates.value[id])
+            val levels = synchronized(samples) { samples[id]?.map { it.rssi } ?: emptyList() }
+            val est = Estimator.estimate(obs, kind, Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, kind, levels), _estimates.value[id])
             _estimates.update { it + (id to est) }
+            if (est.lat != null) synchronized(radiusHistory) {
+                val h = radiusHistory.getOrPut(id) { ArrayList() }
+                if (h.isEmpty() || kotlin.math.abs(h.last() - est.radius) > h.last() * 0.1f) { h += est.radius; while (h.size > 30) h.removeAt(0) }
+            }
             if (est.lat != null && now - (lastEstimateWrite[id] ?: 0L) > 10_000) {
                 lastEstimateWrite[id] = now
                 try { db?.upsertEstimate(sessionId, d, est, now) } catch (_: Exception) {}
@@ -383,7 +461,8 @@ object ScanRepository {
             var next = cur
             for ((id, d) in devs) {
                 val obs = synchronized(obsById) { obsById[id]?.toList() ?: emptyList() }
-                val p = Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, d.kind)
+                val levels = synchronized(samples) { samples[id]?.map { it.rssi } ?: emptyList() }
+                val p = Estimator.persistence(d.firstSeen, d.lastSeen, now, obs, d.kind, levels)
                 val e = cur[id]
                 if (e == null) next = next + (id to Estimator.estimate(obs, d.kind, p))
                 else if (e.persistence != p) next = next + (id to e.copy(persistence = p))
@@ -403,7 +482,7 @@ object ScanRepository {
         io.execute {
             val oldId = _status.value.sessionId
             try { db?.endSession(oldId, System.currentTimeMillis()) } catch (_: Exception) {}
-            synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear(); lastBearingAt.clear()
+            synchronized(obsById) { obsById.clear() }; lastEstimateWrite.clear(); rtt.clear(); lastBearingAt.clear(); synchronized(radiusHistory) { radiusHistory.clear() }
             synchronized(samples) { samples.clear() }
             _devices.value = emptyMap()
             _estimates.value = emptyMap()

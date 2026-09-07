@@ -1,0 +1,5 @@
+- Base fiable : rien n'est posé sur la carte tant que la position n'est pas calibrée (GPS ≤ 10 m / ≥ 6 satellites dehors ; « Je suis ici » ±2/5/10 m ou ancre nommée dedans) ; budget de précision 5 m dedans / 10 m dehors, mesures en pause quand il est dépassé, ligne d'état en clair
+- Ancres intérieures : poser des ancres nommées, « Je suis à l'ancre » pour recalibrer
+- Observations qualifiées : seules celles prises avec une position calibrée positionnent ; persistance = temps + stabilité du signal
+- Preuves par objet : points de vue, couverture angulaire, historique du rayon, prochain geste ; bilan de session
+- Pop-up opaque qui bloque le toucher ; boutons compacts ; comment faire ; autotest ; confiance en clair ; distance depuis moi

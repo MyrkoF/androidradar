@@ -152,6 +152,7 @@ object Exporter {
             put("sats_used", st.satsUsed); put("sats_visible", st.satsVisible); put("heading", st.heading ?: JSONObject.NULL)
             put("pressure_hpa", st.pressureHpa ?: JSONObject.NULL); put("baro_alt_m", st.baroAltM ?: JSONObject.NULL)
             put("steps", st.steps); put("steps_known", st.stepsKnown); put("sensors", st.sensors)
+            put("observer", JSONObject().apply { put("state", st.observer.state.name); put("env", st.observer.env.name); put("acc", if (st.observer.acc == Float.MAX_VALUE) JSONObject.NULL else st.observer.acc); put("source", st.observer.source); put("steps_since_anchor", st.observer.stepsSinceAnchor); put("walked_since_anchor_m", st.observer.walkedSinceAnchor) })
         })
         root.put("journal", JSONArray().apply { for ((t, line) in ScanRepository.logHistory()) put(JSONObject().put("t", stamp.format(Date(t))).put("line", line)) })
         root.put("positions", JSONArray().apply {

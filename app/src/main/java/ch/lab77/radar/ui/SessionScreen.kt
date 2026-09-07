@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.lab77.radar.data.Device
+import ch.lab77.radar.data.ConfidenceRules
+import ch.lab77.radar.data.EnvMode
+import ch.lab77.radar.data.Level
 import ch.lab77.radar.data.DiffEntry
 import ch.lab77.radar.data.DiffKind
 import ch.lab77.radar.data.Kind
@@ -82,6 +85,16 @@ fun SessionScreen(devices: Map<String, Device>, st: ScanStatus, onQuit: () -> Un
                     (if (st.lat != null) "\n@ ${"%.5f".format(st.lat)}, ${"%.5f".format(st.lon)}" else "\nGPS : pas de fix") +
                     "\nRéseau : ${NetworkState.describe(ctx)} (fonds de carte seulement) · Capteurs : ${st.sensors.ifBlank { "(au démarrage d'un relevé)" }}" + (if (st.steps > 0) " · ${st.steps} pas" else ""),
                 color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        item {
+            // Bilan de session (cahier §3 quater) : ce qui est vraiment positionné
+            val est by ScanRepository.estimates.collectAsStateWithLifecycle()
+            val levels = all.map { ConfidenceRules.objectPosition(it, est[it.id]).level }
+            Text(
+                "Bilan : ${levels.count { it == Level.SURE }} confirmés · ${levels.count { it == Level.APPROX }} approximatifs · ${levels.count { it == Level.NONE }} non positionnés / passants" +
+                    " · observateur : ${st.observer.state.name.lowercase()} ±${if (st.observer.acc == Float.MAX_VALUE) "?" else st.observer.acc.toInt().toString()} m (${if (st.observer.env == ch.lab77.radar.data.Env.INDOOR) "intérieur, seuil 5 m" else "extérieur, seuil 10 m"})",
+                color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp
             )
         }
         item { BatteryBanner(st) }
@@ -293,6 +306,10 @@ private fun SettingsPanel(st: ScanStatus, onQuit: () -> Unit) {
             SmallOutlined(onClick = { open(ctx, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }) { Text("Options développeur") }
         }
     }
+    Text("Environnement (seuil de précision : intérieur 5 m, extérieur 10 m) :", color = Palette.text, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((m, l) in listOf(EnvMode.AUTO to "Auto", EnvMode.INDOOR to "Dedans", EnvMode.OUTDOOR to "Dehors")) CompactChip(st.envMode == m, { ScanRepository.setEnvMode(m) }, l)
+    }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value = eye, onValueChange = { v -> eye = v.filter { it.isDigit() }.take(3); eye.toIntOrNull()?.let { SystemTweaks.setEyeHeightCm(ctx, it) } },
             label = { Text("Hauteur des yeux (cm)") }, singleLine = true, modifier = Modifier.weight(1f))
@@ -350,9 +367,12 @@ private val HOWTO = """
 RADAR = maintenant, autour de moi (qui émet, à quelle force). Pour CHERCHER.
 CARTE = où sont les objets, calculé au fil des mesures. Pour PLACER, VÉRIFIER, COMPARER.
 
+0. CALIBRER D'ABORD : rien n'est posé sur la carte tant que la ligne sous les puces n'est pas
+   verte (« Position calibrée »). Dehors : attendre un GPS ≤ 10 m, ≥ 6 satellites, 20 s.
+   Dedans : appui long sur la carte → « Je suis ici » (±2/5/10 m) — ou poser des ANCRES
+   nommées (porte, coins) et toucher l'ancre quand tu es dessus (« Je suis à l'ancre »).
+   Quand la précision se perd (pas, boussole), la ligne passe orange : recalibrer.
 1. Démarrer une mesure : puces Wi-Fi / BLE / Cell en haut (colorées = actif). Écran éteint OK.
-   Dehors, attendre « GPS » en vert dans la barre (≥ 4 satellites).
-   Dedans : appui long sur la carte → « Je suis ici » pour t'ancrer.
 2. Trouver un objet : Radar → toucher son point → moniteur en haut à droite.
    Tourner lentement sur soi-même téléphone devant (un tour ≈ 60 s en Wi-Fi) : la rose
    indique la direction ; « approche / éloigne » dit si tu te rapproches. Voyant vert =

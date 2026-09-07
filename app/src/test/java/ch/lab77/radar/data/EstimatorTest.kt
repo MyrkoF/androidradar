@@ -116,12 +116,15 @@ class EstimatorTest {
         // vu 30 s puis disparu depuis 2 min → passant
         assertEquals(Persistence.PASSING, Estimator.persistence(0, 30_000, 3 * m, listOf(at(0.0, 0.0, -70))))
         // vu 4 min depuis 3 positions étalées, signal variable → stationnaire
-        val stat = listOf(at(0.0, 0.0, -50, 0), at(0.0, 40.0, -70, 2 * m), at(0.0, 80.0, -85, 4 * m))
+        val stat = listOf(at(0.0, 0.0, -60, 0), at(0.0, 40.0, -68, 2 * m), at(0.0, 80.0, -75, 4 * m))
         assertEquals(Persistence.STATIONARY, Estimator.persistence(0, 4 * m, 4 * m, stat))
         // téléphone déplacé de 100 m, signal fort et stable → avec moi
         val mine = listOf(at(0.0, 0.0, -50, 0), at(0.0, 50.0, -52, m), at(0.0, 100.0, -51, 2 * m))
         assertEquals(Persistence.WITH_ME, Estimator.persistence(0, 2 * m, 2 * m, mine))
         // une seule mesure récente → indéterminé
         assertEquals(Persistence.UNKNOWN, Estimator.persistence(0, 10_000, 20_000, listOf(at(0.0, 0.0, -70))))
+        // sans position de qualité : vu 6 min avec un signal stable → stationnaire ; signal instable → indéterminé
+        assertEquals(Persistence.STATIONARY, Estimator.persistence(0, 6 * m, 6 * m, emptyList(), Kind.WIFI, listOf(-70, -72, -69, -71, -70)))
+        assertEquals(Persistence.UNKNOWN, Estimator.persistence(0, 6 * m, 6 * m, emptyList(), Kind.WIFI, listOf(-50, -90, -60, -85, -70)))
     }
 }

@@ -111,6 +111,8 @@ data class ScanStatus(
     val sensors: String = "",       // disponibilité des capteurs, pour l'écran Session
     val turnRateDps: Float = 0f,    // vitesse de rotation lissée (gyroscope), °/s — voyant de rythme
     val stepRate: Float = 0f,       // cadence, pas/s (5 dernières secondes)
+    val observer: Observer = Observer(),   // calibration de l'observateur (cahier §3 quater)
+    val envMode: EnvMode = EnvMode.AUTO,
     val probe: String = "",         // sonde externe : "" / "recherche" / "connectée Radar-TBeam-01 · 87 %"
     val arTracking: String = "",    // suivi caméra ARCore : "" / "initialisation" / "suivi" / "perdu" / "indisponible"
     val sessionStart: Long = 0L,
@@ -130,3 +132,6 @@ data class EstRow(
 enum class DiffKind(val label: String) { NEW("nouveau"), GONE("disparu"), MOVED("déplacé"), CHANGED("modifié") }
 
 data class DiffEntry(val kind: DiffKind, val id: String, val name: String, val category: Category, val detail: String)
+
+/** Ancre nommée posée à l'avance sur la carte (levée en intérieur, cahier §3 quater). */
+data class Anchor(val id: Long, val name: String, val lat: Double, val lon: Double, val acc: Float)

@@ -12,7 +12,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * `session` (un lieu + une date), `estimate` (position estimée + incertitude par émetteur et par session,
  * avec nom/sécurité/type/catégorie pour le diff), `whitelist` (connus du lieu : pas d'alerte).
  */
-class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 4) {
+class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 5) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -29,7 +29,7 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 4) {
         db.execSQL("CREATE INDEX idx_loc_bssid ON location(bssid)")
         db.execSQL("CREATE INDEX idx_loc_time ON location(time)")
         db.execSQL("CREATE INDEX idx_net_lasttime ON network(lasttime)")
-        createV2(db); createV4(db)
+        createV2(db); createV4(db); createV5(db)
     }
 
     private fun createV2(db: SQLiteDatabase) {
@@ -49,10 +49,15 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 4) {
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_loc_session ON location(session_id)")
     }
 
+    private fun createV5(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS anchor (_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, lat REAL, lon REAL, acc REAL, created INTEGER)")
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) { db.execSQL("ALTER TABLE location ADD COLUMN session_id INTEGER"); createV2(db) }
         if (oldVersion < 3) db.execSQL("ALTER TABLE location ADD COLUMN bearing REAL")
         if (oldVersion < 4) createV4(db)
+        if (oldVersion < 5) createV5(db)
     }
 
     // ---- sessions ---------------------------------------------------------------------------------
@@ -184,6 +189,21 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "radar.db", null, 4) {
         }
         writableDatabase.insertWithOnConflict("estimate", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
     }
+
+    // ---- ancres -----------------------------------------------------------------------------------
+
+    fun anchors(): List<Anchor> {
+        val out = ArrayList<Anchor>()
+        readableDatabase.rawQuery("SELECT _id, name, lat, lon, acc FROM anchor ORDER BY _id", null).use { c ->
+            while (c.moveToNext()) out += Anchor(c.getLong(0), c.getString(1) ?: "", c.getDouble(2), c.getDouble(3), c.getFloat(4))
+        }
+        return out
+    }
+
+    fun addAnchor(name: String, lat: Double, lon: Double, acc: Float): Long =
+        writableDatabase.insert("anchor", null, ContentValues().apply { put("name", name); put("lat", lat); put("lon", lon); put("acc", acc); put("created", System.currentTimeMillis()) })
+
+    fun deleteAnchor(id: Long) { writableDatabase.delete("anchor", "_id=?", arrayOf(id.toString())) }
 
     // ---- liste blanche ----------------------------------------------------------------------------
 
